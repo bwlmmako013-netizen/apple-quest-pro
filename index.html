@@ -130,6 +130,11 @@ index 959a60fee9d7493c86f95d9c402a0e64081d3237..bcee85b0fc42ebce51c47dc6ac5bf478
 --- a/index.html
 +++ b/index.html
 @@ -123,103 +123,152 @@
+         diff --git a/index.html b/index.html
+index 959a60fee9d7493c86f95d9c402a0e64081d3237..a56d48545096de8bdd03f260a8a60c3e27588bf6 100644
+--- a/index.html
++++ b/index.html
+@@ -123,103 +123,166 @@
          onSceneUp: function () { this.endDrag(); },
          tick: function () {
            if (!this.dragging || !this.pointerEl || !this.targetEl) return;
@@ -170,10 +175,19 @@ index 959a60fee9d7493c86f95d9c402a0e64081d3237..bcee85b0fc42ebce51c47dc6ac5bf478
 +          this.installStereoRenderer();
 +        },
 +
++        tick: function () {
++          this.installStereoRenderer();
++        },
++
 +        installStereoRenderer: function () {
            var sceneEl = this.el;
            var renderer = sceneEl.renderer;
            if (!renderer || renderer.__stereoModeOriginalRender) return;
++
++          if (renderer.xr) {
++            renderer.__stereoModeOriginalXREnabled = renderer.xr.enabled;
++            renderer.xr.enabled = false;
++          }
 +
            var stereoCamera = new THREE.StereoCamera();
            var originalRender = renderer.render.bind(renderer);
@@ -184,6 +198,7 @@ index 959a60fee9d7493c86f95d9c402a0e64081d3237..bcee85b0fc42ebce51c47dc6ac5bf478
 +
            renderer.render = function (scene, camera) {
              if (renderingStereoEye || !scene || !camera) return originalRender(scene, camera);
++            if (renderer.xr) renderer.xr.enabled = false;
 +
              var size = renderer.getSize(new THREE.Vector2());
 -            var width = size.width, height = size.height, halfWidth = width / 2;
@@ -265,7 +280,11 @@ index 959a60fee9d7493c86f95d9c402a0e64081d3237..bcee85b0fc42ebce51c47dc6ac5bf478
 +
 +          if (renderer && renderer.__stereoModeOriginalRender && renderer.__stereoModeComponent === this) {
              renderer.render = renderer.__stereoModeOriginalRender;
++            if (renderer.xr && renderer.__stereoModeOriginalXREnabled !== undefined) {
++              renderer.xr.enabled = renderer.__stereoModeOriginalXREnabled;
++            }
              delete renderer.__stereoModeOriginalRender;
++            delete renderer.__stereoModeOriginalXREnabled;
 +            delete renderer.__stereoModeComponent;
            }
          }
