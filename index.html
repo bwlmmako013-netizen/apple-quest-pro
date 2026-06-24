@@ -125,6 +125,11 @@ index 959a60fee9d7493c86f95d9c402a0e64081d3237..32dff7de19e698ae69fa5a06fce14a0a
 --- a/index.html
 +++ b/index.html
 @@ -123,103 +123,123 @@
+         diff --git a/index.html b/index.html
+index 959a60fee9d7493c86f95d9c402a0e64081d3237..bcee85b0fc42ebce51c47dc6ac5bf47801ad79cd 100644
+--- a/index.html
++++ b/index.html
+@@ -123,103 +123,152 @@
          onSceneUp: function () { this.endDrag(); },
          tick: function () {
            if (!this.dragging || !this.pointerEl || !this.targetEl) return;
@@ -157,31 +162,50 @@ index 959a60fee9d7493c86f95d9c402a0e64081d3237..32dff7de19e698ae69fa5a06fce14a0a
          <script>
      (function () {
        if (typeof AFRAME === 'undefined' || typeof THREE === 'undefined') return;
++
        AFRAME.registerComponent('stereo-mode', {
          init: function () {
++          this.installStereoRenderer = this.installStereoRenderer.bind(this);
++          this.el.addEventListener('render-target-loaded', this.installStereoRenderer);
++          this.installStereoRenderer();
++        },
++
++        installStereoRenderer: function () {
            var sceneEl = this.el;
            var renderer = sceneEl.renderer;
            if (!renderer || renderer.__stereoModeOriginalRender) return;
++
            var stereoCamera = new THREE.StereoCamera();
            var originalRender = renderer.render.bind(renderer);
            var renderingStereoEye = false;
++
            renderer.__stereoModeOriginalRender = originalRender;
++          renderer.__stereoModeComponent = this;
++
            renderer.render = function (scene, camera) {
              if (renderingStereoEye || !scene || !camera) return originalRender(scene, camera);
++
              var size = renderer.getSize(new THREE.Vector2());
 -            var width = size.width, height = size.height, halfWidth = width / 2;
-+            var width = Math.floor(size.width), height = Math.floor(size.height);
-+            var leftWidth = Math.floor(width / 2), rightWidth = width - leftWidth;
-+            var eyeAspect = leftWidth / height;
++            var width = Math.floor(size.width);
++            var height = Math.floor(size.height);
++            var leftWidth = Math.floor(width / 2);
++            var rightWidth = width - leftWidth;
++            var eyeAspect = (width / 2) / height;
++
++            if (!width || !height || !leftWidth || !rightWidth) return originalRender(scene, camera);
++
              var currentViewport = renderer.getViewport(new THREE.Vector4());
              var currentScissor = renderer.getScissor(new THREE.Vector4());
              var currentScissorTest = renderer.getScissorTest();
              var currentAutoClear = renderer.autoClear;
 +            var originalAspect = camera.aspect;
++
              if (camera.parent === null && sceneEl.camera && sceneEl.camera.parent) sceneEl.camera.parent.updateMatrixWorld();
              scene.updateMatrixWorld();
              if (camera.parent === null) camera.updateMatrixWorld();
-+            if (camera.isPerspectiveCamera && height > 0 && leftWidth > 0) {
++
++            if (camera.isPerspectiveCamera) {
 +              camera.aspect = eyeAspect;
 +              camera.updateProjectionMatrix();
 +              stereoCamera.cameraL.aspect = eyeAspect;
@@ -189,9 +213,11 @@ index 959a60fee9d7493c86f95d9c402a0e64081d3237..32dff7de19e698ae69fa5a06fce14a0a
 +              stereoCamera.cameraL.updateProjectionMatrix();
 +              stereoCamera.cameraR.updateProjectionMatrix();
 +            }
++
              stereoCamera.update(camera);
 +            stereoCamera.cameraL.projectionMatrixInverse.copy(stereoCamera.cameraL.projectionMatrix).invert();
 +            stereoCamera.cameraR.projectionMatrixInverse.copy(stereoCamera.cameraR.projectionMatrix).invert();
++
              renderer.autoClear = false;
              renderer.setScissorTest(true);
              renderer.clear();
@@ -207,19 +233,23 @@ index 959a60fee9d7493c86f95d9c402a0e64081d3237..32dff7de19e698ae69fa5a06fce14a0a
 -            renderer.setScissor(currentScissor);
 -            renderer.setScissorTest(currentScissorTest);
 -            renderer.autoClear = currentAutoClear;
++
 +            try {
-+              renderer.setScissor(0, 0, leftWidth, height);
 +              renderer.setViewport(0, 0, leftWidth, height);
++              renderer.setScissor(0, 0, leftWidth, height);
 +              originalRender(scene, stereoCamera.cameraL);
-+              renderer.setScissor(leftWidth, 0, rightWidth, height);
++
 +              renderer.setViewport(leftWidth, 0, rightWidth, height);
++              renderer.setScissor(leftWidth, 0, rightWidth, height);
 +              originalRender(scene, stereoCamera.cameraR);
 +            } finally {
 +              renderingStereoEye = false;
++
 +              if (camera.isPerspectiveCamera && originalAspect !== undefined) {
 +                camera.aspect = originalAspect;
 +                camera.updateProjectionMatrix();
 +              }
++
 +              renderer.setViewport(currentViewport);
 +              renderer.setScissor(currentScissor);
 +              renderer.setScissorTest(currentScissorTest);
@@ -227,11 +257,16 @@ index 959a60fee9d7493c86f95d9c402a0e64081d3237..32dff7de19e698ae69fa5a06fce14a0a
 +            }
            };
          },
++
          remove: function () {
            var renderer = this.el.renderer;
-           if (renderer && renderer.__stereoModeOriginalRender) {
+-          if (renderer && renderer.__stereoModeOriginalRender) {
++          this.el.removeEventListener('render-target-loaded', this.installStereoRenderer);
++
++          if (renderer && renderer.__stereoModeOriginalRender && renderer.__stereoModeComponent === this) {
              renderer.render = renderer.__stereoModeOriginalRender;
              delete renderer.__stereoModeOriginalRender;
++            delete renderer.__stereoModeComponent;
            }
          }
        });
