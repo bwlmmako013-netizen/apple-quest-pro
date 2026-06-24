@@ -3,215 +3,192 @@
   <head>
     <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-        <title>VisionVR</title>
+        <title>VisionVR Glassmorphism</title>
         <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
         <!-- Script Draggable Component -->
         <script>
-    /* A-Frame 1.6.0 draggable component for VR laser / raycaster pointers.
-    * Add `draggable` to the entity you want to move, or add
-    * `draggable="target: #windowId"` to a child grip/handle.
-    */
+    /* A-Frame 1.6.0 draggable component for VR laser / raycaster pointers */
     (function () {
-    if (typeof AFRAME === 'undefined' || typeof THREE === 'undefined') return;
-    var activeDrag = null;
-    var pointerRay = new THREE.Ray();
-    var pointerOrigin = new THREE.Vector3();
-    var pointerDirection = new THREE.Vector3();
-    var objectWorldPosition = new THREE.Vector3();
-    var targetWorldPosition = new THREE.Vector3();
-    var inverseParentWorldMatrix = new THREE.Matrix4();
-    function getPointerEl(evt) {
-    if (evt.detail && evt.detail.cursorEl) return evt.detail.cursorEl;
-    if (evt.target && evt.target.components && evt.target.components.raycaster) return evt.target;
-    return null;
-    }
-    function updatePointerRay(pointerEl, ray) {
-    var raycaster = pointerEl && pointerEl.components && pointerEl.components.raycaster;
-    if (raycaster && raycaster.raycaster && raycaster.raycaster.ray) {
-    ray.copy(raycaster.raycaster.ray);
-    return true;
-    }
-    if (!pointerEl || !pointerEl.object3D) return false;
-    pointerEl.object3D.getWorldPosition(pointerOrigin);
-    pointerEl.object3D.getWorldDirection(pointerDirection);
-    pointerDirection.normalize();
-    ray.set(pointerOrigin, pointerDirection);
-    return true;
-    }
-    function getWorldTargetPosition(targetEl, worldPosition, outLocalPosition) {
-    var parent = targetEl.object3D.parent;
-    if (!parent) {
-    outLocalPosition.copy(worldPosition);
-    return outLocalPosition;
-    }
-    parent.updateMatrixWorld(true);
-    inverseParentWorldMatrix.copy(parent.matrixWorld).invert();
-    outLocalPosition.copy(worldPosition).applyMatrix4(inverseParentWorldMatrix);
-    return outLocalPosition;
-    }
-    AFRAME.registerComponent('draggable', {
-    schema: {
-    target: { type: 'selector', default: null },
-    distance: { type: 'number', default: 0 },
-    faceCamera: { type: 'boolean', default: false },
-    enabled: { type: 'boolean', default: true }
-    },
-    init: function () {
-    this.dragging = false;
-    this.pointerEl = null;
-    this.targetEl = null;
-    this.dragDistance = 0;
-    this.grabOffset = new THREE.Vector3();
-    this.localPosition = new THREE.Vector3();
-    this.cameraWorldPosition = new THREE.Vector3();
-    this.onDown = this.onDown.bind(this);
-    this.onUp = this.onUp.bind(this);
-    this.onSceneUp = this.onSceneUp.bind(this);
-    this.el.classList.add('interactive');
-    this.el.addEventListener('mousedown', this.onDown);
-    this.el.addEventListener('mouseup', this.onUp);
-    this.el.addEventListener('mouseleave', this.onUp);
-    this.el.addEventListener('touchstart', this.onDown);
-    this.el.addEventListener('touchend', this.onUp);
-    this.el.addEventListener('triggerdown', this.onDown);
-    this.el.addEventListener('triggerup', this.onUp);
-    this.el.addEventListener('gripdown', this.onDown);
-    this.el.addEventListener('gripup', this.onUp);
-    if (this.el.sceneEl) {
-    this.el.sceneEl.addEventListener('mouseup', this.onSceneUp);
-    this.el.sceneEl.addEventListener('touchend', this.onSceneUp);
-    this.el.sceneEl.addEventListener('triggerup', this.onSceneUp);
-    this.el.sceneEl.addEventListener('gripup', this.onSceneUp);
-    }
-    },
-    remove: function () {
-    this.endDrag();
-    this.el.removeEventListener('mousedown', this.onDown);
-    this.el.removeEventListener('mouseup', this.onUp);
-    this.el.removeEventListener('mouseleave', this.onUp);
-    this.el.removeEventListener('touchstart', this.onDown);
-    this.el.removeEventListener('touchend', this.onUp);
-    this.el.removeEventListener('triggerdown', this.onDown);
-    this.el.removeEventListener('triggerup', this.onUp);
-    this.el.removeEventListener('gripdown', this.onDown);
-    this.el.removeEventListener('gripup', this.onUp);
-    if (this.el.sceneEl) {
-    this.el.sceneEl.removeEventListener('mouseup', this.onSceneUp);
-    this.el.sceneEl.removeEventListener('touchend', this.onSceneUp);
-    this.el.sceneEl.removeEventListener('triggerup', this.onSceneUp);
-    this.el.sceneEl.removeEventListener('gripup', this.onSceneUp);
-    }
-    },
-    onDown: function (evt) {
-    if (!this.data.enabled) return;
-    evt.preventDefault();
-    var pointerEl = getPointerEl(evt) || document.querySelector('[raycaster]') || document.querySelector('a-cursor');
-    if (!pointerEl || !updatePointerRay(pointerEl, pointerRay)) return;
-    if (activeDrag && activeDrag !== this) activeDrag.endDrag();
-    activeDrag = this;
-    this.pointerEl = pointerEl;
-    this.targetEl = this.data.target || this.el;
-    this.dragging = true;
-    this.targetEl.object3D.getWorldPosition(objectWorldPosition);
-    this.dragDistance = this.data.distance > 0 ? this.data.distance : pointerRay.origin.distanceTo(objectWorldPosition);
-    targetWorldPosition.copy(pointerRay.origin).add(pointerRay.direction.clone().multiplyScalar(this.dragDistance));
-    this.grabOffset.copy(objectWorldPosition).sub(targetWorldPosition);
-    this.el.emit('drag-start', { target: this.targetEl, pointer: pointerEl }, false);
-    },
-    onUp: function () {
-    this.endDrag();
-    },
-    onSceneUp: function () {
-    this.endDrag();
-    },
-    tick: function () {
-    if (!this.dragging || !this.pointerEl || !this.targetEl) return;
-    if (!updatePointerRay(this.pointerEl, pointerRay)) return;
-    targetWorldPosition.copy(pointerRay.origin)
-    .add(pointerRay.direction.clone().multiplyScalar(this.dragDistance))
-    .add(this.grabOffset);
-    getWorldTargetPosition(this.targetEl, targetWorldPosition, this.localPosition);
-    this.targetEl.object3D.position.copy(this.localPosition);
-    this.targetEl.object3D.matrixWorldNeedsUpdate = true;
-    if (this.data.faceCamera && this.el.sceneEl && this.el.sceneEl.camera) {
-    this.el.sceneEl.camera.getWorldPosition(this.cameraWorldPosition);
-    this.targetEl.object3D.lookAt(this.cameraWorldPosition);
-    }
-    this.el.emit('drag-move', { target: this.targetEl, pointer: this.pointerEl }, false);
-    },
-    endDrag: function () {
-    if (!this.dragging) return;
-    this.dragging = false;
-    this.el.emit('drag-end', { target: this.targetEl, pointer: this.pointerEl }, false);
-    this.pointerEl = null;
-    this.targetEl = null;
-    if (activeDrag === this) activeDrag = null;
-    }
-    });
-    }());
+      if (typeof AFRAME === 'undefined' || typeof THREE === 'undefined') return;
+      var activeDrag = null;
+      var pointerRay = new THREE.Ray();
+      var pointerOrigin = new THREE.Vector3();
+      var pointerDirection = new THREE.Vector3();
+      var objectWorldPosition = new THREE.Vector3();
+      var targetWorldPosition = new THREE.Vector3();
+      var inverseParentWorldMatrix = new THREE.Matrix4();
+
+      function getPointerEl(evt) {
+        if (evt.detail && evt.detail.cursorEl) return evt.detail.cursorEl;
+        if (evt.target && evt.target.components && evt.target.components.raycaster) return evt.target;
+        return null;
+      }
+
+      function updatePointerRay(pointerEl, ray) {
+        var raycaster = pointerEl && pointerEl.components && pointerEl.components.raycaster;
+        if (raycaster && raycaster.raycaster && raycaster.raycaster.ray) {
+          ray.copy(raycaster.raycaster.ray);
+          return true;
+        }
+        if (!pointerEl || !pointerEl.object3D) return false;
+        pointerEl.object3D.getWorldPosition(pointerOrigin);
+        pointerEl.object3D.getWorldDirection(pointerDirection);
+        pointerDirection.normalize();
+        ray.set(pointerOrigin, pointerDirection);
+        return true;
+      }
+
+      function getWorldTargetPosition(targetEl, worldPosition, outLocalPosition) {
+        var parent = targetEl.object3D.parent;
+        if (!parent) {
+          outLocalPosition.copy(worldPosition);
+          return outLocalPosition;
+        }
+        parent.updateMatrixWorld(true);
+        inverseParentWorldMatrix.copy(parent.matrixWorld).invert();
+        outLocalPosition.copy(worldPosition).applyMatrix4(inverseParentWorldMatrix);
+        return outLocalPosition;
+      }
+
+      AFRAME.registerComponent('draggable', {
+        schema: {
+          target: { type: 'selector', default: null },
+          distance: { type: 'number', default: 0 },
+          faceCamera: { type: 'boolean', default: false },
+          enabled: { type: 'boolean', default: true }
+        },
+        init: function () {
+          this.dragging = false;
+          this.pointerEl = null;
+          this.targetEl = null;
+          this.dragDistance = 0;
+          this.grabOffset = new THREE.Vector3();
+          this.localPosition = new THREE.Vector3();
+          this.cameraWorldPosition = new THREE.Vector3();
+          this.onDown = this.onDown.bind(this);
+          this.onUp = this.onUp.bind(this);
+          this.onSceneUp = this.onSceneUp.bind(this);
+          this.el.classList.add('interactive');
+          this.el.addEventListener('mousedown', this.onDown);
+          this.el.addEventListener('mouseup', this.onUp);
+          this.el.addEventListener('mouseleave', this.onUp);
+          this.el.addEventListener('touchstart', this.onDown);
+          this.el.addEventListener('touchend', this.onUp);
+          this.el.addEventListener('triggerdown', this.onDown);
+          this.el.addEventListener('triggerup', this.onUp);
+          this.el.addEventListener('gripdown', this.onDown);
+          this.el.addEventListener('gripup', this.onUp);
+          if (this.el.sceneEl) {
+            this.el.sceneEl.addEventListener('mouseup', this.onSceneUp);
+            this.el.sceneEl.addEventListener('touchend', this.onSceneUp);
+            this.el.sceneEl.addEventListener('triggerup', this.onSceneUp);
+            this.el.sceneEl.addEventListener('gripup', this.onSceneUp);
+          }
+        },
+        remove: function () {
+          this.endDrag();
+          this.el.removeEventListener('mousedown', this.onDown);
+          this.el.removeEventListener('mouseup', this.onUp);
+          this.el.removeEventListener('mouseleave', this.onUp);
+          this.el.removeEventListener('touchstart', this.onDown);
+          this.el.removeEventListener('touchend', this.onUp);
+          this.el.removeEventListener('triggerdown', this.onDown);
+          this.el.removeEventListener('triggerup', this.onUp);
+          this.el.removeEventListener('gripdown', this.onDown);
+          this.el.removeEventListener('gripup', this.onUp);
+          if (this.el.sceneEl) {
+            this.el.sceneEl.removeEventListener('mouseup', this.onSceneUp);
+            this.el.sceneEl.removeEventListener('touchend', this.onSceneUp);
+            this.el.sceneEl.removeEventListener('triggerup', this.onSceneUp);
+            this.el.sceneEl.removeEventListener('gripup', this.onSceneUp);
+          }
+        },
+        onDown: function (evt) {
+          if (!this.data.enabled) return;
+          evt.preventDefault();
+          var pointerEl = getPointerEl(evt) || document.querySelector('[raycaster]') || document.querySelector('a-cursor');
+          if (!pointerEl || !updatePointerRay(pointerEl, pointerRay)) return;
+          if (activeDrag && activeDrag !== this) activeDrag.endDrag();
+          activeDrag = this;
+          this.pointerEl = pointerEl;
+          this.targetEl = this.data.target || this.el;
+          this.dragging = true;
+          this.targetEl.object3D.getWorldPosition(objectWorldPosition);
+          this.dragDistance = this.data.distance > 0 ? this.data.distance : pointerRay.origin.distanceTo(objectWorldPosition);
+          targetWorldPosition.copy(pointerRay.origin).add(pointerRay.direction.clone().multiplyScalar(this.dragDistance));
+          this.grabOffset.copy(objectWorldPosition).sub(targetWorldPosition);
+          this.el.emit('drag-start', { target: this.targetEl, pointer: pointerEl }, false);
+        },
+        onUp: function () { this.endDrag(); },
+        onSceneUp: function () { this.endDrag(); },
+        tick: function () {
+          if (!this.dragging || !this.pointerEl || !this.targetEl) return;
+          if (!updatePointerRay(this.pointerEl, pointerRay)) return;
+          targetWorldPosition.copy(pointerRay.origin)
+            .add(pointerRay.direction.clone().multiplyScalar(this.dragDistance))
+            .add(this.grabOffset);
+          getWorldTargetPosition(this.targetEl, targetWorldPosition, this.localPosition);
+          this.targetEl.object3D.position.copy(this.localPosition);
+          this.targetEl.object3D.matrixWorldNeedsUpdate = true;
+          if (this.data.faceCamera && this.el.sceneEl && this.el.sceneEl.camera) {
+            this.el.sceneEl.camera.getWorldPosition(this.cameraWorldPosition);
+            this.targetEl.object3D.lookAt(this.cameraWorldPosition);
+          }
+          this.el.emit('drag-move', { target: this.targetEl, pointer: this.pointerEl }, false);
+        },
+        endDrag: function () {
+          if (!this.dragging) return;
+          this.dragging = false;
+          this.el.emit('drag-end', { target: this.targetEl, pointer: this.pointerEl }, false);
+          this.pointerEl = null;
+          this.targetEl = null;
+          if (activeDrag === this) activeDrag = null;
+        }
+      });
+    }();
     </script>
         <!-- Script Stereo Mode -->
         <script>
     (function () {
       if (typeof AFRAME === 'undefined' || typeof THREE === 'undefined') return;
-
       AFRAME.registerComponent('stereo-mode', {
         init: function () {
           var sceneEl = this.el;
           var renderer = sceneEl.renderer;
-
           if (!renderer || renderer.__stereoModeOriginalRender) return;
-
           var stereoCamera = new THREE.StereoCamera();
           var originalRender = renderer.render.bind(renderer);
           var renderingStereoEye = false;
-
           renderer.__stereoModeOriginalRender = originalRender;
-
           renderer.render = function (scene, camera) {
-            if (renderingStereoEye || !scene || !camera) {
-              return originalRender(scene, camera);
-            }
-
+            if (renderingStereoEye || !scene || !camera) return originalRender(scene, camera);
             var size = renderer.getSize(new THREE.Vector2());
-            var width = size.width;
-            var height = size.height;
-            var halfWidth = width / 2;
+            var width = size.width, height = size.height, halfWidth = width / 2;
             var currentViewport = renderer.getViewport(new THREE.Vector4());
             var currentScissor = renderer.getScissor(new THREE.Vector4());
             var currentScissorTest = renderer.getScissorTest();
             var currentAutoClear = renderer.autoClear;
-
-            if (camera.parent === null && sceneEl.camera && sceneEl.camera.parent) {
-              sceneEl.camera.parent.updateMatrixWorld();
-            }
-
+            if (camera.parent === null && sceneEl.camera && sceneEl.camera.parent) sceneEl.camera.parent.updateMatrixWorld();
             scene.updateMatrixWorld();
             if (camera.parent === null) camera.updateMatrixWorld();
-
             stereoCamera.update(camera);
-
             renderer.autoClear = false;
             renderer.setScissorTest(true);
             renderer.clear();
-
             renderingStereoEye = true;
             renderer.setScissor(0, 0, halfWidth, height);
             renderer.setViewport(0, 0, halfWidth, height);
             originalRender(scene, stereoCamera.cameraL);
-
             renderer.setScissor(halfWidth, 0, halfWidth, height);
             renderer.setViewport(halfWidth, 0, halfWidth, height);
             originalRender(scene, stereoCamera.cameraR);
             renderingStereoEye = false;
-
             renderer.setViewport(currentViewport);
             renderer.setScissor(currentScissor);
             renderer.setScissorTest(currentScissorTest);
             renderer.autoClear = currentAutoClear;
           };
         },
-
         remove: function () {
           var renderer = this.el.renderer;
           if (renderer && renderer.__stereoModeOriginalRender) {
@@ -220,19 +197,19 @@
           }
         }
       });
-    }());
+    }();
     </script>
         <style>
-      *{margin:0;padding:0;box-sizing:border-box}
-      body{overflow:hidden;background:#000;font-family:-apple-system,system-ui,sans-serif}
-      #fileInput{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:202}
-      #audioInput{position:fixed;left:-9999px;opacity:0;width:1px;height:1px}
-      #filePickerOverlay{position:fixed;top:0;left:0;width:100%;height:100%;z-index:200;display:none;align-items:center;justify-content:center}
-      #filePickerOverlay .picker-bg{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6)}
-      #filePickerBtn{position:relative;background:#5e9eff;color:#fff;border:none;padding:14px 32px;border-radius:12px;font-size:18px;font-weight:600;cursor:pointer;z-index:201;box-shadow:0 4px 20px rgba(94,158,255,0.4)}
-      #cinemaTapOverlay{position:fixed;top:0;left:0;width:100%;height:100%;z-index:300;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.5)}
-      #cinemaTapBtn{background:#5e9eff;color:#fff;border:none;padding:18px 40px;border-radius:16px;font-size:20px;font-weight:600;cursor:pointer;z-index:301;box-shadow:0 4px 24px rgba(0,0,0,0.6)}
-      .a-canvas{z-index:1}
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { overflow: hidden; background: #000; font-family: -apple-system, system-ui, sans-serif; }
+      #fileInput { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 202; }
+      #audioInput { position: fixed; left: -9999px; opacity: 0; width: 1px; height: 1px; }
+      #filePickerOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; display: none; align-items: center; justify-content: center; }
+      #filePickerOverlay .picker-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); }
+      #filePickerBtn { position: relative; background: #5e9eff; color: #fff; border: none; padding: 14px 32px; border-radius: 12px; font-size: 18px; font-weight: 600; cursor: pointer; z-index: 201; box-shadow: 0 4px 20px rgba(94,158,255,0.4); }
+      #cinemaTapOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 300; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); }
+      #cinemaTapBtn { background: #5e9eff; color: #fff; border: none; padding: 18px 40px; border-radius: 16px; font-size: 20px; font-weight: 600; cursor: pointer; z-index: 301; box-shadow: 0 4px 24px rgba(0,0,0,0.6); }
+      .a-canvas { z-index: 1; }
     </style>
       </head>
       <body>
@@ -248,46 +225,47 @@
     </a-camera>
     <a-sky id="sky">
   </a-sky>
-  <!-- Menu Principal (Dock) -->
+  <!-- Menu Principal (Dock) - Glassmorphism Style -->
   <a-entity id="spatialMenu" position="0 1.6 -2">
-  <a-plane id="dockShadow" width="2.6" height="0.56" position="0 -0.01 0.015" rotation="0 0 0">
+  <a-plane id="dockShadow" width="3.2" height="1.0" position="0 -0.01 0.015" rotation="0 0 0">
 </a-plane>
-<a-plane id="dockBorder" width="2.6" height="0.56" position="0 0 0.008">
+<a-plane id="dockBorder" width="3.2" height="1.0" position="0 0 0.008" material="transparent: true; shader: flat">
 </a-plane>
-<a-plane id="dockGlass" width="2.6" height="0.56" position="0 0 0">
+<a-plane id="dockGlass" width="3.2" height="1.0" position="0 0 0" material="transparent: true; shader: flat">
 </a-plane>
-<a-entity id="widgetGrid" position="-0.7 0.1 0.01">
+<!-- WidgetGrid CENTRE -->
+<a-entity id="widgetGrid" position="0 0.15 0.01">
 </a-entity>
-<a-entity id="labelsContainer" position="0 0.24 0.01">
+<a-entity id="labelsContainer" position="0 0.4 0.01">
 </a-entity>
-<a-text id="dockNotification" value="" position="0 -0.3 0.02" color="#fff" align="center" width="2.4" visible="false" side="double">
+<a-text id="dockNotification" value="" position="0 -0.4 0.02" color="#fff" align="center" width="3" visible="false" side="double">
 </a-text>
-<a-entity id="dotsContainer" position="0 -0.22 0.02">
+<a-entity id="dotsContainer" position="0 -0.32 0.02">
 </a-entity>
-<a-plane id="resizeMinus3d" class="interactive" width="0.08" height="0.08" position="-1.2 -0.18 0.01" color="rgba(255,255,255,0.15)">
+<a-plane id="resizeMinus3d" class="interactive" width="0.08" height="0.08" position="-1.45 -0.42 0.01" color="rgba(255,255,255,0.15)">
 </a-plane>
-<a-text value="−" position="-1.2 -0.18 0.02" color="#fff" align="center" width="0.08">
+<a-text value="-" position="-1.45 -0.42 0.02" color="#fff" align="center" width="0.08">
 </a-text>
-<a-plane id="resizePlus3d" class="interactive" width="0.08" height="0.08" position="1.2 -0.18 0.01" color="rgba(255,255,255,0.15)">
+<a-plane id="resizePlus3d" class="interactive" width="0.08" height="0.08" position="1.45 -0.42 0.01" color="rgba(255,255,255,0.15)">
 </a-plane>
-<a-text value="+" position="1.2 -0.18 0.02" color="#fff" align="center" width="0.08">
+<a-text value="+" position="1.45 -0.42 0.02" color="#fff" align="center" width="0.08">
 </a-text>
-<a-plane id="cycleBtn3d" class="interactive" width="0.12" height="0.08" position="0 -0.18 0.01" color="rgba(255,255,255,0.1)">
+<a-plane id="cycleBtn3d" class="interactive" width="0.12" height="0.08" position="0 -0.42 0.01" color="rgba(255,255,255,0.1)">
 </a-plane>
-<a-text value="↻" position="0 -0.18 0.02" color="#fff" align="center" width="0.12">
+<a-text value="R" position="0 -0.42 0.02" color="#fff" align="center" width="0.12">
 </a-text>
 </a-entity>
-<!-- Fenêtre Galerie (Draggable via Grip) -->
+<!-- Fenetre Galerie (Draggable via Grip) -->
 <a-entity id="galleryWindow" scale="0.7 0.7 0.7" visible="false">
 <a-plane id="galleryGrip" class="interactive" width="1.2" height="0.1" position="0 0.65 0.01" color="#444" draggable="target: #galleryWindow">
 </a-plane>
-<a-text value="⠿ ⠿ ⠿" position="0 0.65 0.02" color="#fff" align="center" width="1.2">
+<a-text value="..." position="0 0.65 0.02" color="#fff" align="center" width="1.2">
 </a-text>
 <a-plane width="1.2" height="1.4" position="0 0 0" color="rgba(20,20,30,0.85)">
 </a-plane>
 <a-plane id="galleryClose" class="interactive" width="0.15" height="0.15" position="0.5 0.7 0.01" color="#c0392b">
 </a-plane>
-<a-text value="✕" position="0.5 0.7 0.02" color="#fff" align="center" width="0.15">
+<a-text value="X" position="0.5 0.7 0.02" color="#fff" align="center" width="0.15">
 </a-text>
 <a-text value="Galerie" position="0 0.58 0.01" color="#fff" align="center" width="1">
 </a-text>
@@ -304,10 +282,10 @@
 </a-plane>
 <a-plane id="imageViewerClose" class="interactive" width="0.15" height="0.15" position="0.9 0.7 0.01" color="#c0392b">
 </a-plane>
-<a-text value="✕" position="0.9 0.7 0.02" color="#fff" align="center" width="0.15">
+<a-text value="X" position="0.9 0.7 0.02" color="#fff" align="center" width="0.15">
 </a-text>
 </a-entity>
-<!-- Lecteur Vidéo Cinéma (Draggable) -->
+<!-- Lecteur Video Cinema (Draggable) -->
 <a-entity id="videoCinema" class="interactive" position="0 1.6 -5" scale="4 2.25 1" visible="false" draggable>
 <a-plane id="cinemaVideo" width="1" height="0.56" position="0 0 0" material="shader: flat; transparent: false; npot: true; color: #000">
 </a-plane>
@@ -315,11 +293,11 @@
 </a-plane>
 <a-plane id="videoPlayBtn" class="interactive" width="0.06" height="0.03" position="0 -0.3 0.01" color="#5e9eff">
 </a-plane>
-<a-text value="▶/⏸" position="0 -0.3 0.02" color="#fff" align="center" width="0.06">
+<a-text value="P" position="0 -0.3 0.02" color="#fff" align="center" width="0.06">
 </a-text>
 <a-plane id="videoCloseBtn" class="interactive" width="0.05" height="0.05" position="0.45 0.27 0.01" color="#c0392b">
 </a-plane>
-<a-text value="✕" position="0.45 0.27 0.02" color="#fff" align="center" width="0.05">
+<a-text value="X" position="0.45 0.27 0.02" color="#fff" align="center" width="0.05">
 </a-text>
 </a-entity>
 </a-scene>
@@ -327,923 +305,1544 @@
   <div class="picker-bg">
   </div>
   <div style="position:relative;display:inline-block">
-    <button id="filePickerBtn" type="button">Choisir une photo / vidéo</button>
+    <button id="filePickerBtn" type="button">Choisir une photo / video</button>
     <input type="file" id="fileInput" multiple accept="image/*,video/*,video/mp4,video/quicktime">
     </div>
   </div>
   <div id="cinemaTapOverlay">
-    <button id="cinemaTapBtn">▶ Lire la vidéo</button>
+    <button id="cinemaTapBtn">> Lire la video</button>
   </div>
   <input type="file" id="audioInput" accept="audio/*">
     <audio id="musicAudio">
     </audio>
     <script>
-    /* ===== 1. COULEURS ===== */
-    function hexToRgb(h){var r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return{r:r,g:g,b:b}}
-    function lerpColor(c1,c2,t){return{r:Math.round(c1.r+(c2.r-c1.r)*t),g:Math.round(c1.g+(c2.g-c1.g)*t),b:Math.round(c1.b+(c2.b-c1.b)*t)}}
-    function rgbStr(c){return'rgb('+c.r+','+c.g+','+c.b+')'}
-    function hexToRgba(h,a){var c=hexToRgb(h);return'rgba('+c.r+','+c.g+','+c.b+','+a+')'}
+    /* ===== 1. GLASSMORPHISM TEXTURE GENERATION ===== */
+    // Configuration du dock
+    var dockConfig = {
+      width: 3.2,
+      height: 1.0,
+      cornerRadius: 0.04,
+      glassOpacity: 0.25,
+      borderOpacity: 0.15,
+      blur: 20,
+      scaleFactor: 2 // Resolution multiplier
+    };
 
-    /* ===== 2. ENVIRONNEMENTS 360° ===== */
-    function create360Env(palette,drawFeatures){
-      var c=document.createElement('canvas');c.width=2048;c.height=1024;var ctx=c.getContext('2d');
-      var sky=palette.sky||'#1a1a2e',ground=palette.ground||'#16213e';
-      var grad=ctx.createLinearGradient(0,0,0,512);grad.addColorStop(0,sky);grad.addColorStop(1,ground);
-      ctx.fillStyle=grad;ctx.fillRect(0,0,2048,512);
-      ctx.fillStyle=ground;ctx.fillRect(0,512,2048,512);
-      if(drawFeatures){
-        if(drawFeatures.stars){
-          for(var i=0;i<300;i++){ctx.fillStyle='rgba(255,255,255,'+(Math.random()*0.7+0.3)+')';var sx=Math.random()*2048,sy=Math.random()*400;ctx.beginPath();ctx.arc(sx,sy,Math.random()*1.5+0.5,0,Math.PI*2);ctx.fill()}
-        }
-        if(drawFeatures.mountains){
-          ctx.fillStyle='rgba(255,255,255,0.03)';for(var m=0;m<20;m++){var mx=m*120+Math.random()*40,mh=80+Math.random()*120;ctx.beginPath();ctx.moveTo(mx,512);ctx.quadraticCurveTo(mx+40,512-mh,mx+80,512);ctx.fill()}
-        }
-        if(drawFeatures.groundLine){ctx.fillStyle='rgba(255,255,255,0.05)';ctx.fillRect(0,508,2048,8)}
-        if(drawFeatures.clouds){
-          ctx.fillStyle='rgba(255,255,255,0.02)';for(var cl=0;cl<15;cl++){var cxl=Math.random()*2048,cyl=100+Math.random()*300,cwr=80+Math.random()*200;ctx.beginPath();ctx.ellipse(cxl,cyl,cwr,20,0,0,Math.PI*2);ctx.fill()}
-        }
-      }
-      return c.toDataURL('image/png')
+    // Fonction principale pour dessiner un rectangle arrondi
+    function drawRoundedRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
     }
 
-    var environments=[
-      {url:'https://threejs.org/examples/textures/2294472375_24a3b8ef46_o.jpg'},
-      {palette:{sky:'#1a1a3e',ground:'#2a1a3e'},features:{stars:true,groundLine:true,clouds:false}},
-      {palette:{sky:'#2e1a0a',ground:'#3e2a1a'},features:{stars:true,clouds:true,groundLine:true}},
-      {palette:{sky:'#0a1a2e',ground:'#0a2a1e'},features:{stars:true,mountains:true,groundLine:true}},
-      {palette:{sky:'#1a0a1a',ground:'#2a1a2a'},features:{stars:true,clouds:true,mountains:true}},
-      {palette:{sky:'#0a0a0a',ground:'#1a1a1a'},features:{stars:true,groundLine:true}}
+    // Generation de la texture Glassmorphism principale
+    function createGlassmorphismTexture(config) {
+      var scale = config.scaleFactor || 2;
+      var canvasW = Math.floor(config.width * 512 * scale);
+      var canvasH = Math.floor(config.height * 512 * scale);
+      var c = document.createElement('canvas');
+      c.width = canvasW;
+      c.height = canvasH;
+      var ctx = c.getContext('2d');
+
+      var radius = config.cornerRadius * 512 * scale;
+      var padding = 4 * scale;
+
+      // Clear
+      ctx.clearRect(0, 0, canvasW, canvasH);
+
+      // Effet de flou/blur en couches (simule le backdrop-filter)
+      for (var i = 0; i < 3; i++) {
+        ctx.globalAlpha = 0.08 * (1 - i * 0.2);
+        drawRoundedRect(ctx, padding - i * 2, padding - i * 2, canvasW - padding * 2 + i * 4, canvasH - padding * 2 + i * 4, radius);
+        ctx.fillStyle = '#ffffff';
+        ctx.filter = 'blur(' + (config.blur + i * 5) + 'px)';
+        ctx.fill();
+      }
+      ctx.filter = 'none';
+      ctx.globalAlpha = 1;
+
+      // Fond translucide principal (glass effect)
+      drawRoundedRect(ctx, padding, padding, canvasW - padding * 2, canvasH - padding * 2, radius);
+      var gradient = ctx.createLinearGradient(0, 0, 0, canvasH);
+      gradient.addColorStop(0, 'rgba(255, 255, 255, ' + (config.glassOpacity * 0.6).toFixed(2) + ')');
+      gradient.addColorStop(0.5, 'rgba(255, 255, 255, ' + config.glassOpacity.toFixed(2) + ')');
+      gradient.addColorStop(1, 'rgba(255, 255, 255, ' + (config.glassOpacity * 0.8).toFixed(2) + ')');
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      // Bordure subtile avec effet de lumiere
+      drawRoundedRect(ctx, padding, padding, canvasW - padding * 2, canvasH - padding * 2, radius);
+      ctx.strokeStyle = 'rgba(255, 255, 255, ' + config.borderOpacity.toFixed(2) + ')';
+      ctx.lineWidth = 1.5 * scale;
+      ctx.stroke();
+
+      // Highlight en haut (reflet Apple Vision Pro)
+      var highlightGradient = ctx.createLinearGradient(0, padding, 0, padding + radius * 2);
+      highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
+      highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.save();
+      drawRoundedRect(ctx, padding, padding, canvasW - padding * 2, canvasH - padding * 2, radius);
+      ctx.clip();
+      ctx.fillStyle = highlightGradient;
+      ctx.fillRect(padding, padding, canvasW - padding * 2, radius * 2.5);
+      ctx.restore();
+
+      // Subtil motif de bruit pour plus de realisme
+      ctx.globalAlpha = 0.02;
+      for (var j = 0; j < 2000; j++) {
+        var nx = Math.random() * canvasW;
+        var ny = Math.random() * canvasH;
+        ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#000000';
+        ctx.fillRect(nx, ny, 1, 1);
+      }
+      ctx.globalAlpha = 1;
+
+      return c.toDataURL('image/png');
+    }
+
+    // Generation de la bordure avec glow
+    function createGlassBorderTexture(config) {
+      var scale = config.scaleFactor || 2;
+      var canvasW = Math.floor(config.width * 512 * scale);
+      var canvasH = Math.floor(config.height * 512 * scale);
+      var c = document.createElement('canvas');
+      c.width = canvasW;
+      c.height = canvasH;
+      var ctx = c.getContext('2d');
+
+      var radius = config.cornerRadius * 512 * scale;
+      var padding = 4 * scale;
+
+      ctx.clearRect(0, 0, canvasW, canvasH);
+
+      // Glow exterieur
+      ctx.shadowColor = 'rgba(255, 255, 255, 0.3)';
+      ctx.shadowBlur = 30 * scale;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+
+      drawRoundedRect(ctx, padding, padding, canvasW - padding * 2, canvasH - padding * 2, radius);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.lineWidth = 2 * scale;
+      ctx.stroke();
+
+      // Border interne plus lumineuse
+      ctx.shadowBlur = 0;
+      drawRoundedRect(ctx, padding + 2, padding + 2, canvasW - padding * 2 - 4, canvasH - padding * 2 - 4, radius * 0.95);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 1 * scale;
+      ctx.stroke();
+
+      return c.toDataURL('image/png');
+    }
+
+    // Generation de l'ombre portee
+    function createGlassShadowTexture(config) {
+      var scale = config.scaleFactor || 2;
+      var canvasW = Math.floor(config.width * 512 * scale);
+      var canvasH = Math.floor(config.height * 512 * scale);
+      var c = document.createElement('canvas');
+      c.width = canvasW;
+      c.height = canvasH;
+      var ctx = c.getContext('2d');
+
+      var radius = config.cornerRadius * 512 * scale;
+
+      // Ombre douce
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = 60 * scale;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 15 * scale;
+
+      drawRoundedRect(ctx, 20, 20, canvasW - 40, canvasH - 40, radius);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.fill();
+
+      return c.toDataURL('image/png');
+    }
+
+    // Mise a jour des textures du dock
+    function updateDockTextures() {
+      var glassUri = createGlassmorphismTexture(dockConfig);
+      var borderUri = createGlassBorderTexture(dockConfig);
+      var shadowUri = createGlassShadowTexture(dockConfig);
+
+      var dockGlass = document.getElementById('dockGlass');
+      var dockBorder = document.getElementById('dockBorder');
+      var dockShadow = document.getElementById('dockShadow');
+
+      if (dockGlass) {
+        dockGlass.setAttribute('width', dockConfig.width.toString());
+        dockGlass.setAttribute('material', 'src', glassUri);
+        dockGlass.setAttribute('material', 'transparent', 'true');
+        dockGlass.setAttribute('material', 'shader', 'flat');
+      }
+
+      if (dockBorder) {
+        dockBorder.setAttribute('width', dockConfig.width.toString());
+        dockBorder.setAttribute('material', 'src', borderUri);
+        dockBorder.setAttribute('material', 'transparent', 'true');
+        dockBorder.setAttribute('material', 'shader', 'flat');
+      }
+
+      if (dockShadow) {
+        dockShadow.setAttribute('width', dockConfig.width.toString());
+        dockShadow.setAttribute('material', 'src', shadowUri);
+        dockShadow.setAttribute('material', 'transparent', 'true');
+        dockShadow.setAttribute('material', 'shader', 'flat');
+      }
+
+      // Repositionner les boutons de resize en fonction de la nouvelle largeur
+      var halfWidth = dockConfig.width / 2;
+      var resizeMinus = document.getElementById('resizeMinus3d');
+      var resizePlus = document.getElementById('resizePlus3d');
+
+      if (resizeMinus) {
+        resizeMinus.setAttribute('position', (-(halfWidth - 0.15)) + ' -0.42 0.01');
+        resizeMinus.querySelector('a-text')?.setAttribute('position', (-(halfWidth - 0.15)) + ' -0.42 0.02');
+      }
+      if (resizePlus) {
+        resizePlus.setAttribute('position', (halfWidth - 0.15) + ' -0.42 0.01');
+        resizePlus.querySelector('a-text')?.setAttribute('position', (halfWidth - 0.15) + ' -0.42 0.02');
+      }
+
+      // Mettre a jour les labels des boutons resize
+      var minusLabel = document.querySelector('a-text[value="-"]');
+      var plusLabel = document.querySelector('a-text[value="+"]');
+      if (minusLabel) minusLabel.setAttribute('position', (-(halfWidth - 0.15)) + ' -0.42 0.02');
+      if (plusLabel) plusLabel.setAttribute('position', (halfWidth - 0.15) + ' -0.42 0.02');
+    }
+
+    /* ===== 2. COULEURS ===== */
+    function hexToRgb(h) {
+      var r = parseInt(h.slice(1, 3), 16),
+          g = parseInt(h.slice(3, 5), 16),
+          b = parseInt(h.slice(5, 7), 16);
+      return { r: r, g: g, b: b };
+    }
+
+    function lerpColor(c1, c2, t) {
+      return {
+        r: Math.round(c1.r + (c2.r - c1.r) * t),
+        g: Math.round(c1.g + (c2.g - c1.g) * t),
+        b: Math.round(c1.b + (c2.b - c1.b) * t)
+      };
+    }
+
+    function rgbStr(c) { return 'rgb(' + c.r + ',' + c.g + ',' + c.b + ')'; }
+
+    function hexToRgba(h, a) {
+      var c = hexToRgb(h);
+      return 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + a + ')';
+    }
+
+    /* ===== 3. ENVIRONNEMENTS 360 DEGRES ===== */
+    function create360Env(palette, drawFeatures) {
+      var c = document.createElement('canvas');
+      c.width = 2048;
+      c.height = 1024;
+      var ctx = c.getContext('2d');
+      var sky = palette.sky || '#1a1a2e',
+          ground = palette.ground || '#16213e';
+      var grad = ctx.createLinearGradient(0, 0, 0, 512);
+      grad.addColorStop(0, sky);
+      grad.addColorStop(1, ground);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 2048, 512);
+      ctx.fillStyle = ground;
+      ctx.fillRect(0, 512, 2048, 512);
+      if (drawFeatures) {
+        if (drawFeatures.stars) {
+          for (var i = 0; i < 300; i++) {
+            ctx.fillStyle = 'rgba(255,255,255,' + (Math.random() * 0.7 + 0.3) + ')';
+            var sx = Math.random() * 2048,
+                sy = Math.random() * 400;
+            ctx.beginPath();
+            ctx.arc(sx, sy, Math.random() * 1.5 + 0.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        if (drawFeatures.mountains) {
+          ctx.fillStyle = 'rgba(255,255,255,0.03)';
+          for (var m = 0; m < 20; m++) {
+            var mx = m * 120 + Math.random() * 40,
+                mh = 80 + Math.random() * 120;
+            ctx.beginPath();
+            ctx.moveTo(mx, 512);
+            ctx.quadraticCurveTo(mx + 40, 512 - mh, mx + 80, 512);
+            ctx.fill();
+          }
+        }
+        if (drawFeatures.groundLine) {
+          ctx.fillStyle = 'rgba(255,255,255,0.05)';
+          ctx.fillRect(0, 508, 2048, 8);
+        }
+        if (drawFeatures.clouds) {
+          ctx.fillStyle = 'rgba(255,255,255,0.02)';
+          for (var cl = 0; cl < 15; cl++) {
+            var cxl = Math.random() * 2048,
+                cyl = 100 + Math.random() * 300,
+                cwr = 80 + Math.random() * 200;
+            ctx.beginPath();
+            ctx.ellipse(cxl, cyl, cwr, 20, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+      return c.toDataURL('image/png');
+    }
+
+    var environments = [
+      { url: 'https://threejs.org/examples/textures/2294472375_24a3b8ef46_o.jpg' },
+      { palette: { sky: '#1a1a3e', ground: '#2a1a3e' }, features: { stars: true, groundLine: true, clouds: false } },
+      { palette: { sky: '#2e1a0a', ground: '#3e2a1a' }, features: { stars: true, clouds: true, groundLine: true } },
+      { palette: { sky: '#0a1a2e', ground: '#0a2a1e' }, features: { stars: true, mountains: true, groundLine: true } },
+      { palette: { sky: '#1a0a1a', ground: '#2a1a2a' }, features: { stars: true, clouds: true, mountains: true } },
+      { palette: { sky: '#0a0a0a', ground: '#1a1a1a' }, features: { stars: true, groundLine: true } }
     ];
 
-    var currentEnv=0;
+    var currentEnv = 0;
 
-    function cycleEnvironment(){
-      currentEnv=(currentEnv+1)%environments.length;
+    function cycleEnvironment() {
+      currentEnv = (currentEnv + 1) % environments.length;
       setEnvironment(currentEnv);
-      updateDots()
+      updateDots();
     }
 
-    function setEnvironment(idx){
-      var env=environments[idx];
-      var sky=document.getElementById('sky');
-      if(env.url){sky.setAttribute('src',env.url)}
-      else{sky.setAttribute('src',create360Env(env.palette,env.features))}
-    }
-
-    function updateDots(){
-      var dots=document.querySelectorAll('.envDot');
-      dots.forEach(function(d,i){d.setAttribute('color',i===currentEnv?'#5e9eff':'rgba(255,255,255,0.3)')})
-    }
-
-    function buildDots(){
-      var container=document.getElementById('dotsContainer');
-      for(var i=0;i<environments.length;i++){
-        var dot=document.createElement('a-plane');
-        dot.className='envDot';
-        dot.setAttribute('width','0.04');dot.setAttribute('height','0.04');
-        dot.setAttribute('position',((i-(environments.length-1)/2)*0.1)+' 0 0');
-        dot.setAttribute('color','rgba(255,255,255,0.3)');
-        dot.setAttribute('material','shader: flat');
-        container.appendChild(dot)
+    function setEnvironment(idx) {
+      var env = environments[idx];
+      var sky = document.getElementById('sky');
+      if (env.url) {
+        sky.setAttribute('src', env.url);
+      } else {
+        sky.setAttribute('src', create360Env(env.palette, env.features));
       }
-      updateDots()
     }
 
-    /* ===== 3. TEXTURES DOCK ===== */
-    function roundRect(ctx,x,y,w,h,r){
-      ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);
-      ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);
-      ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);
-      ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);
-      ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()
+    function updateDots() {
+      var dots = document.querySelectorAll('.envDot');
+      dots.forEach(function(d, i) {
+        d.setAttribute('color', i === currentEnv ? '#5e9eff' : 'rgba(255,255,255,0.3)');
+      });
     }
 
-    function createRoundedRectTexture(w,h,r,fill,stroke,strokeW){
-      var c=document.createElement('canvas');var scale=512;c.width=scale;c.height=scale*(h/w);
-      var ctx=c.getContext('2d');var cw=c.width,ch=c.height;
-      roundRect(ctx,2,2,cw-4,ch-4,r*scale/w||8);
-      if(fill){ctx.fillStyle=fill;ctx.fill()}
-      if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=strokeW||2;ctx.stroke()}
-      return c.toDataURL('image/png')
+    function buildDots() {
+      var container = document.getElementById('dotsContainer');
+      for (var i = 0; i < environments.length; i++) {
+        var dot = document.createElement('a-plane');
+        dot.className = 'envDot';
+        dot.setAttribute('width', '0.04');
+        dot.setAttribute('height', '0.04');
+        dot.setAttribute('position', ((i - (environments.length - 1) / 2) * 0.1) + ' 0 0');
+        dot.setAttribute('color', 'rgba(255,255,255,0.3)');
+        dot.setAttribute('material', 'shader: flat');
+        container.appendChild(dot);
+      }
+      updateDots();
     }
 
-    function createShadowTexture(w,h,r){
-      var c=document.createElement('canvas');var s=512;c.width=s;c.height=s*(h/w);
-      var ctx=c.getContext('2d');var cw=c.width,ch=c.height;
-      roundRect(ctx,8,8,cw-16,ch-16,r*s/w||8);
-      ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=40;ctx.fillStyle='rgba(0,0,0,0.3)';ctx.fill();
-      return c.toDataURL('image/png')
+    /* ===== 4. TEXTURES UTILITAIRES ===== */
+    function createGridTexture() {
+      var c = document.createElement('canvas');
+      c.width = 64;
+      c.height = 64;
+      var ctx = c.getContext('2d');
+      ctx.fillStyle = 'rgba(255,255,255,0.03)';
+      ctx.fillRect(0, 0, 64, 64);
+      ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+      ctx.lineWidth = 1;
+      for (var i = 0; i <= 64; i += 16) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, 64);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(64, i);
+        ctx.stroke();
+      }
+      return c.toDataURL('image/png');
     }
 
-    function createGridTexture(){
-      var c=document.createElement('canvas');c.width=64;c.height=64;var ctx=c.getContext('2d');
-      ctx.fillStyle='rgba(255,255,255,0.03)';ctx.fillRect(0,0,64,64);
-      ctx.strokeStyle='rgba(255,255,255,0.05)';ctx.lineWidth=1;
-      for(var i=0;i<=64;i+=16){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,64);ctx.stroke();ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(64,i);ctx.stroke()}
-      return c.toDataURL('image/png')
+    /* ===== 5. ICONES VISIONOS ===== */
+    function createVisionOSIcon(symbol, accentColor) {
+      var c = document.createElement('canvas');
+      c.width = 128;
+      c.height = 128;
+      var ctx = c.getContext('2d');
+      var s = 128,
+          r = 28;
+
+      drawRoundedRect(ctx, 2, 2, s - 4, s - 4, r);
+      var grad = ctx.createLinearGradient(0, 0, s, s);
+      grad.addColorStop(0, accentColor);
+      grad.addColorStop(0.6, accentColor);
+      grad.addColorStop(1, 'rgba(255,255,255,0.2)');
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      ctx.shadowColor = 'rgba(255,255,255,0.3)';
+      ctx.shadowBlur = 4;
+      drawRoundedRect(ctx, 2, 2, s - 4, s - 4, r);
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      ctx.font = '52px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff';
+      ctx.fillText(symbol, 64, 60);
+
+      var hg = ctx.createLinearGradient(0, 0, 0, s * 0.4);
+      hg.addColorStop(0, 'rgba(255,255,255,0.25)');
+      hg.addColorStop(1, 'rgba(255,255,255,0)');
+      drawRoundedRect(ctx, 2, 2, s - 4, s * 0.4, r);
+      ctx.fillStyle = hg;
+      ctx.fill();
+
+      return c.toDataURL('image/png');
     }
 
-    /* ===== 4. ICÔNES VISIONOS ===== */
-    function createVisionOSIcon(symbol,accentColor){
-      var c=document.createElement('canvas');c.width=128;c.height=128;var ctx=c.getContext('2d');
-      var s=128,r=28;
-      roundRect(ctx,2,2,s-4,s-4,r);
-      var grad=ctx.createLinearGradient(0,0,s,s);
-      grad.addColorStop(0,accentColor);grad.addColorStop(0.6,accentColor);grad.addColorStop(1,'rgba(255,255,255,0.2)');
-      ctx.fillStyle=grad;ctx.fill();
-      ctx.shadowColor='rgba(255,255,255,0.3)';ctx.shadowBlur=4;
-      roundRect(ctx,2,2,s-4,s-4,r);ctx.strokeStyle='rgba(255,255,255,0.4)';ctx.lineWidth=1.5;ctx.stroke();
-      ctx.shadowBlur=0;
-      ctx.font='52px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#fff';
-      ctx.fillText(symbol,64,60);
-      var hg=ctx.createLinearGradient(0,0,0,s*0.4);
-      hg.addColorStop(0,'rgba(255,255,255,0.25)');hg.addColorStop(1,'rgba(255,255,255,0)');
-      roundRect(ctx,2,2,s-4,s*0.4,r);ctx.fillStyle=hg;ctx.fill();
-      ctx.globalCompositeOperation='source-atop';
-      return c.toDataURL('image/png')
-    }
-
-    /* ===== 5. WIDGETS & ACTIONS ===== */
-    var widgets=[
-      {app:'safari',label:'Safari',symbol:'🌐',color:'#5e9eff'},
-      {app:'games',label:'Jeux',symbol:'🎮',color:'#ff6b6b'},
-      {app:'gallery',label:'Galerie',symbol:'🖼️',color:'#51cf66'},
-      {app:'weather',label:'Météo',symbol:'🌤️',color:'#fcc419'},
-      {app:'clock',label:'Horloge',symbol:'⏰',color:'#845ef7'},
-      {app:'music',label:'Musique',symbol:'🎵',color:'#ff922b'}
+    /* ===== 6. WIDGETS & ACTIONS ===== */
+    var widgets = [
+      { app: 'safari', label: 'Safari', symbol: 'S', color: '#5e9eff' },
+      { app: 'games', label: 'Jeux', symbol: 'J', color: '#ff6b6b' },
+      { app: 'gallery', label: 'Galerie', symbol: 'G', color: '#51cf66' },
+      { app: 'weather', label: 'Meteo', symbol: 'W', color: '#fcc419' },
+      { app: 'clock', label: 'Horloge', symbol: 'H', color: '#845ef7' },
+      { app: 'music', label: 'Musique', symbol: 'M', color: '#ff922b' }
     ];
 
-    var appActions={
-      safari:{label:'Safari',action:function(){openWindow('safari')}},
-      games:{label:'Jeux',action:function(){openWindow('games')}},
-      gallery:{label:'Galerie',action:function(){openWindow('gallery')}},
-      weather:{label:'Météo',action:function(){openWindow('weather')}},
-      clock:{label:'Horloge',action:function(){openWindow('clock')}},
-      music:{label:'Musique',action:function(){openWindow('music')}}
+    var appActions = {
+      safari: { label: 'Safari', action: function() { openWindow('safari'); } },
+      games: { label: 'Jeux', action: function() { openWindow('games'); } },
+      gallery: { label: 'Galerie', action: function() { openWindow('gallery'); } },
+      weather: { label: 'Meteo', action: function() { openWindow('weather'); } },
+      clock: { label: 'Horloge', action: function() { openWindow('clock'); } },
+      music: { label: 'Musique', action: function() { openWindow('music'); } }
     };
 
-    /* ===== 6. GRILLE WIDGETS ===== */
-    function buildWidgets(){
-      var grid=document.getElementById('widgetGrid');grid.innerHTML='';
-      var cols=3,spacingX=0.7,startX=-(cols-1)*spacingX/2;
-      widgets.forEach(function(w,i){
-        var col=i%cols,row=Math.floor(i/cols);
-        var x=startX+col*spacingX,y=row*0.38;
-        var iconUrl=createVisionOSIcon(w.symbol,w.color);
-        var bg=document.createElement('a-plane');
-        bg.className='interactive';bg.setAttribute('width','0.55');bg.setAttribute('height','0.3');
-        bg.setAttribute('position',x+' '+y+' 0');
-        bg.setAttribute('color','rgba(255,255,255,0.05)');
-        bg.setAttribute('widget-handler','');
-        bg.id='widget_'+w.app;
+    /* ===== 7. GRILLE WIDGETS - DYNAMIQUE ET CENTREE ===== */
+    function buildWidgets() {
+      var grid = document.getElementById('widgetGrid');
+      grid.innerHTML = '';
+
+      var totalWidgets = widgets.length;
+      var cols = 3;
+      var rows = Math.ceil(totalWidgets / cols);
+
+      var spacingX = 0.85;
+      var spacingY = 0.45;
+      var startX = -((cols - 1) * spacingX) / 2;
+      var startY = 0;
+
+      widgets.forEach(function(w, i) {
+        var col = i % cols;
+        var row = Math.floor(i / cols);
+        var x = startX + col * spacingX;
+        var y = startY - row * spacingY;
+
+        var iconUrl = createVisionOSIcon(w.symbol, w.color);
+
+        var bg = document.createElement('a-plane');
+        bg.className = 'interactive';
+        bg.setAttribute('width', '0.6');
+        bg.setAttribute('height', '0.38');
+        bg.setAttribute('position', x + ' ' + y + ' 0');
+        bg.setAttribute('color', 'rgba(255,255,255,0.05)');
+        bg.setAttribute('widget-handler', '');
+        bg.id = 'widget_' + w.app;
         grid.appendChild(bg);
-        var icon=document.createElement('a-image');
-        icon.setAttribute('src',iconUrl);
-        icon.setAttribute('width','0.18');icon.setAttribute('height','0.18');
-        icon.setAttribute('position',x+' '+(y+0.04)+' 0.01');
+
+        var icon = document.createElement('a-image');
+        icon.setAttribute('src', iconUrl);
+        icon.setAttribute('width', '0.22');
+        icon.setAttribute('height', '0.22');
+        icon.setAttribute('position', x + ' ' + (y + 0.06) + ' 0.01');
         grid.appendChild(icon);
-        var lbl=document.createElement('a-text');
-        lbl.setAttribute('value',w.label);
-        lbl.setAttribute('position',x+' '+(y-0.12)+' 0.01');
-        lbl.setAttribute('color','rgba(255,255,255,0.8)');
-        lbl.setAttribute('align','center');lbl.setAttribute('width','0.5');
-        lbl.setAttribute('scale','0.8 0.8 0.8');
-        grid.appendChild(lbl)
-      })
+
+        var lbl = document.createElement('a-text');
+        lbl.setAttribute('value', w.label);
+        lbl.setAttribute('position', x + ' ' + (y - 0.14) + ' 0.01');
+        lbl.setAttribute('color', 'rgba(255,255,255,0.8)');
+        lbl.setAttribute('align', 'center');
+        lbl.setAttribute('width', '0.6');
+        lbl.setAttribute('scale', '0.8 0.8 0.8');
+        grid.appendChild(lbl);
+      });
     }
 
-    /* ===== 7. GESTION FENÊTRES ===== */
-    var windowIdMap={
-      safari:'windowSafari',games:'windowGames',gallery:'galleryWindow',
-      weather:'windowWeather',clock:'windowClock',music:'windowMusic'
+    /* ===== 8. GESTION FENETRES ===== */
+    var windowIdMap = {
+      safari: 'windowSafari',
+      games: 'windowGames',
+      gallery: 'galleryWindow',
+      weather: 'windowWeather',
+      clock: 'windowClock',
+      music: 'windowMusic'
     };
-    var windowInit={};
-    var windowOpened={};
+    var windowInit = {};
+    var windowOpened = {};
 
-    function getPositionInFrontOfCamera(dist,heightY){
-      var cam=document.querySelector('a-camera');
-      if(!cam)return{x:0,y:heightY||1.6,z:-(dist||1.5)};
-      var p=new THREE.Vector3();cam.object3D.getWorldPosition(p);
-      var q=new THREE.Quaternion();cam.object3D.getWorldQuaternion(q);
-      var f=new THREE.Vector3(0,0,-1);f.applyQuaternion(q);f.y=0;f.normalize();
-      var t=p.clone().add(f.multiplyScalar(dist||1.5));t.y=heightY||1.6;
-      return{x:t.x,y:t.y,z:t.z}
+    function getPositionInFrontOfCamera(dist, heightY) {
+      var cam = document.querySelector('a-camera');
+      if (!cam) return { x: 0, y: heightY || 1.6, z: -(dist || 1.5) };
+      var p = new THREE.Vector3();
+      cam.object3D.getWorldPosition(p);
+      var q = new THREE.Quaternion();
+      cam.object3D.getWorldQuaternion(q);
+      var f = new THREE.Vector3(0, 0, -1);
+      f.applyQuaternion(q);
+      f.y = 0;
+      f.normalize();
+      var t = p.clone().add(f.multiplyScalar(dist || 1.5));
+      t.y = heightY || 1.6;
+      return { x: t.x, y: t.y, z: t.z };
     }
-    var spawnInFrontOfCamera=getPositionInFrontOfCamera;
 
-    var openWindow=function(appId){
-      var id=windowIdMap[appId];var el=document.getElementById(id);
-      if(!el)return;
+    var spawnInFrontOfCamera = getPositionInFrontOfCamera;
 
-      var pos=spawnInFrontOfCamera(2,1.6);
-      console.log('[openWindow] '+appId+' target pos:',pos,'parent:',(el.parentEl?el.parentEl.tagName:'none'));
+    var openWindow = function(appId) {
+      var id = windowIdMap[appId];
+      var el = document.getElementById(id);
+      if (!el) return;
 
+      var pos = spawnInFrontOfCamera(2, 1.6);
       el.removeAttribute('position');
-      el.object3D.position.set(pos.x,pos.y,pos.z);
-      el.object3D.matrixWorldNeedsUpdate=true;
-      el.object3D.matrixAutoUpdate=true;
+      el.object3D.position.set(pos.x, pos.y, pos.z);
+      el.object3D.matrixWorldNeedsUpdate = true;
+      el.object3D.matrixAutoUpdate = true;
 
-      for(var i=0;i<3;i++){
-        (function(x,y,z){
-          requestAnimationFrame(function(){
-            var e=document.getElementById(id);
-            if(!e)return;
-            e.object3D.position.set(x,y,z);
-            e.object3D.matrixWorldNeedsUpdate=true
-          })
-        })(pos.x,pos.y,pos.z)
+      for (var i = 0; i < 3; i++) {
+        (function(x, y, z) {
+          requestAnimationFrame(function() {
+            var e = document.getElementById(id);
+            if (!e) return;
+            e.object3D.position.set(x, y, z);
+            e.object3D.matrixWorldNeedsUpdate = true;
+          });
+        })(pos.x, pos.y, pos.z);
       }
 
-      el.setAttribute('visible','true');
-      if(windowInit[appId]&&!windowOpened[appId]){windowInit[appId]();windowOpened[appId]=true}
-
-      var mon=0,monId=setInterval(function(){
-        var e=document.getElementById(id);
-        if(!e||mon>20){clearInterval(monId);return}
-        var p=e.object3D.position;
-        console.log('[pos] frame '+mon+':',p.x.toFixed(2),p.y.toFixed(2),p.z.toFixed(2));
-        mon++
-      },500)
+      el.setAttribute('visible', 'true');
+      if (windowInit[appId] && !windowOpened[appId]) {
+        windowInit[appId]();
+        windowOpened[appId] = true;
+      }
     };
 
-    function closeWindow(appId){
-      var id=windowIdMap[appId];var el=document.getElementById(id);
-      if(!el)return;
-      el.setAttribute('visible','false');
-      if(appId==='gallery')closeImageViewer();
-      if(appId==='music'){var a=document.getElementById('musicAudio');a.pause()}
+    function closeWindow(appId) {
+      var id = windowIdMap[appId];
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.setAttribute('visible', 'false');
+      if (appId === 'gallery') closeImageViewer();
+      if (appId === 'music') {
+        var a = document.getElementById('musicAudio');
+        a.pause();
+      }
     }
 
-    function loadURL(url){
-      if(!url)return;
-      if(!url.match(/^https?:\/\//i))url='https://'+url;
-      var w=window.open(url,'_blank');
-      if(w)w.focus();
-      else showNotification('Autorisez les popups pour ouvrir Safari')
+    function loadURL(url) {
+      if (!url) return;
+      if (!url.match(/^https?:\/\//i)) url = 'https://' + url;
+      var w = window.open(url, '_blank');
+      if (w) w.focus();
+      else showNotification('Autorisez les popups pour ouvrir Safari');
     }
 
-    /* ===== 8. FENÊTRES DYNAMIQUES ===== */
-    function createAppWindow(id,title,w,h){
-      var win=document.createElement('a-entity');
-      var winId = 'window'+id.charAt(0).toUpperCase()+id.slice(1);
-      win.id=winId;
-      win.setAttribute('visible','false');win.setAttribute('scale','0.7 0.7 0.7');
-      
-      var grip=document.createElement('a-plane');
-      grip.id=id+'Grip';grip.className='interactive';
-      grip.setAttribute('width',w);grip.setAttribute('height','0.1');
-      grip.setAttribute('position','0 '+(h/2+0.02)+' 0.01');grip.setAttribute('color','#444');
-      
-      // AJOUT DU DRAGGABLE ICI POUR LES FENÊTRES DYNAMIQUES
+    /* ===== 9. FENETRES DYNAMIQUES ===== */
+    function createAppWindow(id, title, w, h) {
+      var win = document.createElement('a-entity');
+      var winId = 'window' + id.charAt(0).toUpperCase() + id.slice(1);
+      win.id = winId;
+      win.setAttribute('visible', 'false');
+      win.setAttribute('scale', '0.7 0.7 0.7');
+
+      var grip = document.createElement('a-plane');
+      grip.id = id + 'Grip';
+      grip.className = 'interactive';
+      grip.setAttribute('width', w);
+      grip.setAttribute('height', '0.1');
+      grip.setAttribute('position', '0 ' + (h / 2 + 0.02) + ' 0.01');
+      grip.setAttribute('color', '#444');
       grip.setAttribute('draggable', 'target: #' + winId);
-      
       win.appendChild(grip);
-      
-      var gt=document.createElement('a-text');
-      gt.setAttribute('value','⠿ ⠿ ⠿');gt.setAttribute('position','0 0 0.01');
-      gt.setAttribute('color','#fff');gt.setAttribute('align','center');gt.setAttribute('width',w);
+
+      var gt = document.createElement('a-text');
+      gt.setAttribute('value', '...');
+      gt.setAttribute('position', '0 0 0.01');
+      gt.setAttribute('color', '#fff');
+      gt.setAttribute('align', 'center');
+      gt.setAttribute('width', w);
       grip.appendChild(gt);
-      
-      var bg=document.createElement('a-plane');
-      bg.setAttribute('width',w);bg.setAttribute('height',h);
-      bg.setAttribute('position','0 0 0');bg.setAttribute('color','rgba(20,20,30,0.85)');
+
+      var bg = document.createElement('a-plane');
+      bg.setAttribute('width', w);
+      bg.setAttribute('height', h);
+      bg.setAttribute('position', '0 0 0');
+      bg.setAttribute('color', 'rgba(20,20,30,0.85)');
       win.appendChild(bg);
-      
-      var cl=document.createElement('a-plane');
-      cl.id=id+'Close';cl.className='interactive';
-      cl.setAttribute('width','0.15');cl.setAttribute('height','0.15');
-      cl.setAttribute('position',(w/2-0.1)+' '+(h/2-0.1)+' 0.01');cl.setAttribute('color','#c0392b');
+
+      var cl = document.createElement('a-plane');
+      cl.id = id + 'Close';
+      cl.className = 'interactive';
+      cl.setAttribute('width', '0.15');
+      cl.setAttribute('height', '0.15');
+      cl.setAttribute('position', (w / 2 - 0.1) + ' ' + (h / 2 - 0.1) + ' 0.01');
+      cl.setAttribute('color', '#c0392b');
       win.appendChild(cl);
-      
-      var ct=document.createElement('a-text');
-      ct.setAttribute('value','✕');ct.setAttribute('position','0 0 0.01');
-      ct.setAttribute('color','#fff');ct.setAttribute('align','center');ct.setAttribute('width','0.15');
+
+      var ct = document.createElement('a-text');
+      ct.setAttribute('value', 'X');
+      ct.setAttribute('position', '0 0 0.01');
+      ct.setAttribute('color', '#fff');
+      ct.setAttribute('align', 'center');
+      ct.setAttribute('width', '0.15');
       cl.appendChild(ct);
-      
-      var tt=document.createElement('a-text');
-      tt.setAttribute('value',title);tt.setAttribute('position','0 '+(h/2-0.12)+' 0.01');
-      tt.setAttribute('color','#fff');tt.setAttribute('align','center');tt.setAttribute('width',w-0.3);
+
+      var tt = document.createElement('a-text');
+      tt.setAttribute('value', title);
+      tt.setAttribute('position', '0 ' + (h / 2 - 0.12) + ' 0.01');
+      tt.setAttribute('color', '#fff');
+      tt.setAttribute('align', 'center');
+      tt.setAttribute('width', w - 0.3);
       win.appendChild(tt);
-      
-      var content=document.createElement('a-entity');
-      content.id=id+'Content';content.setAttribute('position','0 -0.05 0.02');
+
+      var content = document.createElement('a-entity');
+      content.id = id + 'Content';
+      content.setAttribute('position', '0 -0.05 0.02');
       win.appendChild(content);
-      
-      return win
+
+      return win;
     }
 
-    function buildAppWindows(){
-      var scene=document.querySelector('a-scene');
-      var apps=[
-        {id:'safari',title:'Safari',w:1.0,h:0.8},
-        {id:'games',title:'Jeux',w:0.8,h:0.7},
-        {id:'weather',title:'Météo',w:0.7,h:0.6},
-        {id:'clock',title:'Horloge',w:0.7,h:0.7},
-        {id:'music',title:'Musique',w:0.8,h:0.7}
+    function buildAppWindows() {
+      var scene = document.querySelector('a-scene');
+      var apps = [
+        { id: 'safari', title: 'Safari', w: 1.0, h: 0.8 },
+        { id: 'games', title: 'Jeux', w: 0.8, h: 0.7 },
+        { id: 'weather', title: 'Meteo', w: 0.7, h: 0.6 },
+        { id: 'clock', title: 'Horloge', w: 0.7, h: 0.7 },
+        { id: 'music', title: 'Musique', w: 0.8, h: 0.7 }
       ];
-      apps.forEach(function(a){
-        var win=createAppWindow(a.id,a.title,a.w,a.h);
-        scene.appendChild(win)
-      })
+      apps.forEach(function(a) {
+        var win = createAppWindow(a.id, a.title, a.w, a.h);
+        scene.appendChild(win);
+      });
     }
 
-    /* ===== 9. SETUP APPLICATIONS ===== */
-    function setupSafari(content){
-      content.innerHTML='';
-      var barBg=document.createElement('a-plane');
-      barBg.setAttribute('width','0.9');barBg.setAttribute('height','0.08');
-      barBg.setAttribute('position','0 0.2 0.01');barBg.setAttribute('color','rgba(255,255,255,0.08)');
+    /* ===== 10. SETUP APPLICATIONS ===== */
+    function setupSafari(content) {
+      content.innerHTML = '';
+      var barBg = document.createElement('a-plane');
+      barBg.setAttribute('width', '0.9');
+      barBg.setAttribute('height', '0.08');
+      barBg.setAttribute('position', '0 0.2 0.01');
+      barBg.setAttribute('color', 'rgba(255,255,255,0.08)');
       content.appendChild(barBg);
-      var urlText=document.createElement('a-text');
-      urlText.setAttribute('value','exemple.com');urlText.setAttribute('position','-0.3 0.2 0.02');
-      urlText.setAttribute('color','rgba(255,255,255,0.6)');urlText.setAttribute('align','left');
-      urlText.setAttribute('width','0.6');urlText.setAttribute('scale','0.7 0.7 0.7');
+
+      var urlText = document.createElement('a-text');
+      urlText.setAttribute('value', 'exemple.com');
+      urlText.setAttribute('position', '-0.3 0.2 0.02');
+      urlText.setAttribute('color', 'rgba(255,255,255,0.6)');
+      urlText.setAttribute('align', 'left');
+      urlText.setAttribute('width', '0.6');
+      urlText.setAttribute('scale', '0.7 0.7 0.7');
       content.appendChild(urlText);
-      var goBtn=document.createElement('a-plane');
-      goBtn.id='safariGoBtn';goBtn.className='interactive';
-      goBtn.setAttribute('width','0.12');goBtn.setAttribute('height','0.07');
-      goBtn.setAttribute('position','0.38 0.2 0.01');goBtn.setAttribute('color','#5e9eff');
+
+      var goBtn = document.createElement('a-plane');
+      goBtn.id = 'safariGoBtn';
+      goBtn.className = 'interactive';
+      goBtn.setAttribute('width', '0.12');
+      goBtn.setAttribute('height', '0.07');
+      goBtn.setAttribute('position', '0.38 0.2 0.01');
+      goBtn.setAttribute('color', '#5e9eff');
       content.appendChild(goBtn);
-      var goLbl=document.createElement('a-text');
-      goLbl.setAttribute('value','Go');goLbl.setAttribute('position','0 0 0.01');
-      goLbl.setAttribute('color','#fff');goLbl.setAttribute('align','center');goLbl.setAttribute('width','0.12');
+
+      var goLbl = document.createElement('a-text');
+      goLbl.setAttribute('value', 'Go');
+      goLbl.setAttribute('position', '0 0 0.01');
+      goLbl.setAttribute('color', '#fff');
+      goLbl.setAttribute('align', 'center');
+      goLbl.setAttribute('width', '0.12');
       goBtn.appendChild(goLbl);
-      goBtn.addEventListener('click',function(){
-        var url=prompt('Entrez une URL:')||'';
-        if(url.trim())loadURL(url.trim())
+
+      goBtn.addEventListener('click', function() {
+        var url = prompt('Entrez une URL:') || '';
+        if (url.trim()) loadURL(url.trim());
       });
-      var info=document.createElement('a-text');
-      info.setAttribute('value','Navigateur web intégré');info.setAttribute('position','0 -0.05 0.01');
-      info.setAttribute('color','rgba(255,255,255,0.4)');info.setAttribute('align','center');
-      info.setAttribute('width','0.8');info.setAttribute('scale','0.7 0.7 0.7');
+
+      var info = document.createElement('a-text');
+      info.setAttribute('value', 'Navigateur web integre');
+      info.setAttribute('position', '0 -0.05 0.01');
+      info.setAttribute('color', 'rgba(255,255,255,0.4)');
+      info.setAttribute('align', 'center');
+      info.setAttribute('width', '0.8');
+      info.setAttribute('scale', '0.7 0.7 0.7');
       content.appendChild(info);
     }
 
-    function setupGames(content){
-      content.innerHTML='';
-      var games=['Snake','Pong','Morpion'];
-      games.forEach(function(g,i){
-        var x=(i-1)*0.25;
-        var btn=document.createElement('a-plane');
-        btn.id='gameBtn_'+g.toLowerCase();
-        btn.className='interactive';
-        btn.setAttribute('width','0.2');btn.setAttribute('height','0.1');
-        btn.setAttribute('position',x+' 0.1 0.01');btn.setAttribute('color','rgba(255,255,255,0.1)');
-        btn.setAttribute('radius','0.02');
+    function setupGames(content) {
+      content.innerHTML = '';
+      var games = ['Snake', 'Pong', 'Morpion'];
+      games.forEach(function(g, i) {
+        var x = (i - 1) * 0.25;
+        var btn = document.createElement('a-plane');
+        btn.id = 'gameBtn_' + g.toLowerCase();
+        btn.className = 'interactive';
+        btn.setAttribute('width', '0.2');
+        btn.setAttribute('height', '0.1');
+        btn.setAttribute('position', x + ' 0.1 0.01');
+        btn.setAttribute('color', 'rgba(255,255,255,0.1)');
+        btn.setAttribute('radius', '0.02');
         content.appendChild(btn);
-        var lbl=document.createElement('a-text');
-        lbl.setAttribute('value',g);lbl.setAttribute('position','0 0 0.01');
-        lbl.setAttribute('color','#fff');lbl.setAttribute('align','center');lbl.setAttribute('width','0.2');
+
+        var lbl = document.createElement('a-text');
+        lbl.setAttribute('value', g);
+        lbl.setAttribute('position', '0 0 0.01');
+        lbl.setAttribute('color', '#fff');
+        lbl.setAttribute('align', 'center');
+        lbl.setAttribute('width', '0.2');
         btn.appendChild(lbl);
-        btn.addEventListener('click',function(){
-          showNotification(g+' — bientôt disponible')
-        })
+
+        btn.addEventListener('click', function() {
+          showNotification(g + ' - bientot disponible');
+        });
       });
-      var info=document.createElement('a-text');
-      info.setAttribute('value','Jeux classiques en réalité spatiale');
-      info.setAttribute('position','0 -0.15 0.01');info.setAttribute('color','rgba(255,255,255,0.4)');
-      info.setAttribute('align','center');info.setAttribute('width','0.7');info.setAttribute('scale','0.7 0.7 0.7');
+
+      var info = document.createElement('a-text');
+      info.setAttribute('value', 'Jeux classiques en realite spatiale');
+      info.setAttribute('position', '0 -0.15 0.01');
+      info.setAttribute('color', 'rgba(255,255,255,0.4)');
+      info.setAttribute('align', 'center');
+      info.setAttribute('width', '0.7');
+      info.setAttribute('scale', '0.7 0.7 0.7');
       content.appendChild(info);
     }
 
-    function setupWeather(content){
-      content.innerHTML='';
-      var conditions=['Ensoleillé','Nuageux','Pluvieux','Neigeux','Orageux'];
-      var currentCond=0;
-      var condText=document.createElement('a-text');
-      condText.id='weatherCond';
-      condText.setAttribute('value',conditions[0]);
-      condText.setAttribute('position','0 0.18 0.01');condText.setAttribute('color','#fcc419');
-      condText.setAttribute('align','center');condText.setAttribute('width','0.6');
+    function setupWeather(content) {
+      content.innerHTML = '';
+      var conditions = ['Ensoleille', 'Nuageux', 'Pluvieux', 'Neigeux', 'Orageux'];
+      var currentCond = 0;
+
+      var condText = document.createElement('a-text');
+      condText.id = 'weatherCond';
+      condText.setAttribute('value', conditions[0]);
+      condText.setAttribute('position', '0 0.18 0.01');
+      condText.setAttribute('color', '#fcc419');
+      condText.setAttribute('align', 'center');
+      condText.setAttribute('width', '0.6');
       content.appendChild(condText);
-      var tempText=document.createElement('a-text');
-      tempText.id='weatherTemp';
-      tempText.setAttribute('value','22°C');
-      tempText.setAttribute('position','0 0.05 0.01');tempText.setAttribute('color','#fff');
-      tempText.setAttribute('align','center');tempText.setAttribute('width','0.6');
+
+      var tempText = document.createElement('a-text');
+      tempText.id = 'weatherTemp';
+      tempText.setAttribute('value', '22C');
+      tempText.setAttribute('position', '0 0.05 0.01');
+      tempText.setAttribute('color', '#fff');
+      tempText.setAttribute('align', 'center');
+      tempText.setAttribute('width', '0.6');
       content.appendChild(tempText);
-      var cycleBtn=document.createElement('a-plane');
-      cycleBtn.id='weatherCycleBtn';cycleBtn.className='interactive';
-      cycleBtn.setAttribute('width','0.25');cycleBtn.setAttribute('height','0.08');
-      cycleBtn.setAttribute('position','0 -0.12 0.01');cycleBtn.setAttribute('color','rgba(255,255,255,0.1)');
+
+      var cycleBtn = document.createElement('a-plane');
+      cycleBtn.id = 'weatherCycleBtn';
+      cycleBtn.className = 'interactive';
+      cycleBtn.setAttribute('width', '0.25');
+      cycleBtn.setAttribute('height', '0.08');
+      cycleBtn.setAttribute('position', '0 -0.12 0.01');
+      cycleBtn.setAttribute('color', 'rgba(255,255,255,0.1)');
       content.appendChild(cycleBtn);
-      var cycleLbl=document.createElement('a-text');
-      cycleLbl.setAttribute('value','Cycle');cycleLbl.setAttribute('position','0 0 0.01');
-      cycleLbl.setAttribute('color','#fff');cycleLbl.setAttribute('align','center');cycleLbl.setAttribute('width','0.25');
+
+      var cycleLbl = document.createElement('a-text');
+      cycleLbl.setAttribute('value', 'Cycle');
+      cycleLbl.setAttribute('position', '0 0 0.01');
+      cycleLbl.setAttribute('color', '#fff');
+      cycleLbl.setAttribute('align', 'center');
+      cycleLbl.setAttribute('width', '0.25');
       cycleBtn.appendChild(cycleLbl);
-      cycleBtn.addEventListener('click',function(){
-        currentCond=(currentCond+1)%conditions.length;
-        condText.setAttribute('value',conditions[currentCond]);
-        var temps=[22,18,10,-2,15];tempText.setAttribute('value',temps[currentCond]+'°C')
-      })
+
+      cycleBtn.addEventListener('click', function() {
+        currentCond = (currentCond + 1) % conditions.length;
+        condText.setAttribute('value', conditions[currentCond]);
+        var temps = [22, 18, 10, -2, 15];
+        tempText.setAttribute('value', temps[currentCond] + 'C');
+      });
     }
 
-    function setupClock(content){
-      content.innerHTML='';
-      var cv=document.createElement('canvas');cv.width=256;cv.height=256;
-      var ctx=cv.getContext('2d');
-      ctx.fillStyle='rgba(20,20,30,0.9)';ctx.beginPath();ctx.arc(128,128,120,0,Math.PI*2);ctx.fill();
-      ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(128,128,120,0,Math.PI*2);ctx.stroke();
-      for(var i=0;i<12;i++){var a=i*Math.PI/6;ctx.fillStyle='rgba(255,255,255,0.6)';ctx.fillRect(126+100*Math.sin(a),126-100*Math.cos(a),4,8)}
-      var div=document.createElement('a-entity');
-      div.setAttribute('geometry','primitive: plane; width: 0.5; height: 0.5');
-      div.setAttribute('material','shader: flat; src: '+cv.toDataURL());
-      div.setAttribute('position','0 0.1 0.01');
-      div.id='clockTexture';
+    function setupClock(content) {
+      content.innerHTML = '';
+      var cv = document.createElement('canvas');
+      cv.width = 256;
+      cv.height = 256;
+      var ctx = cv.getContext('2d');
+      ctx.fillStyle = 'rgba(20,20,30,0.9)';
+      ctx.beginPath();
+      ctx.arc(128, 128, 120, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(128, 128, 120, 0, Math.PI * 2);
+      ctx.stroke();
+      for (var i = 0; i < 12; i++) {
+        var a = i * Math.PI / 6;
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.fillRect(126 + 100 * Math.sin(a), 126 - 100 * Math.cos(a), 4, 8);
+      }
+
+      var div = document.createElement('a-entity');
+      div.setAttribute('geometry', 'primitive: plane; width: 0.5; height: 0.5');
+      div.setAttribute('material', 'shader: flat; src: ' + cv.toDataURL());
+      div.setAttribute('position', '0 0.1 0.01');
+      div.id = 'clockTexture';
       content.appendChild(div);
-      window.__clockCanvas=cv;window.__clockCtx=ctx;window.__clockInterval=null;
-      window.__clockTextureEl=div
+
+      window.__clockCanvas = cv;
+      window.__clockCtx = ctx;
+      window.__clockInterval = null;
+      window.__clockTextureEl = div;
     }
 
-    function tickClock(){
-      var cv=window.__clockCanvas,ctx=window.__clockCtx;
-      if(!cv||!ctx)return;
-      ctx.clearRect(0,0,256,256);
-      ctx.fillStyle='rgba(20,20,30,0.9)';ctx.beginPath();ctx.arc(128,128,120,0,Math.PI*2);ctx.fill();
-      ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(128,128,120,0,Math.PI*2);ctx.stroke();
-      for(var i=0;i<12;i++){var a=i*Math.PI/6;ctx.fillStyle='rgba(255,255,255,0.6)';ctx.fillRect(126+100*Math.sin(a),126-100*Math.cos(a),4,8)}
-      var now=new Date();var h=now.getHours()%12,m=now.getMinutes(),s=now.getSeconds();
-      var ha=h*Math.PI/6+m*Math.PI/360,ma=m*Math.PI/30,sa=s*Math.PI/30;
-      ctx.strokeStyle='#fff';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(128,128);ctx.lineTo(128+60*Math.sin(ha),128-60*Math.cos(ha));ctx.stroke();
-      ctx.strokeStyle='#5e9eff';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(128,128);ctx.lineTo(128+85*Math.sin(ma),128-85*Math.cos(ma));ctx.stroke();
-      ctx.strokeStyle='#e74c3c';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(128,128);ctx.lineTo(128+95*Math.sin(sa),128-95*Math.cos(sa));ctx.stroke();
-      ctx.fillStyle='#5e9eff';ctx.beginPath();ctx.arc(128,128,4,0,Math.PI*2);ctx.fill();
-      var el=window.__clockTextureEl;
-      if(el&&el.components&&el.components.material){
-        var mat=el.components.material.material;
-        if(mat.map){mat.map.needsUpdate=true}
-        else{var tex=new THREE.CanvasTexture(cv);tex.minFilter=THREE.LinearFilter;mat.map=tex;mat.needsUpdate=true}
+    function tickClock() {
+      var cv = window.__clockCanvas,
+          ctx = window.__clockCtx;
+      if (!cv || !ctx) return;
+
+      ctx.clearRect(0, 0, 256, 256);
+      ctx.fillStyle = 'rgba(20,20,30,0.9)';
+      ctx.beginPath();
+      ctx.arc(128, 128, 120, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(128, 128, 120, 0, Math.PI * 2);
+      ctx.stroke();
+
+      for (var i = 0; i < 12; i++) {
+        var a = i * Math.PI / 6;
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.fillRect(126 + 100 * Math.sin(a), 126 - 100 * Math.cos(a), 4, 8);
+      }
+
+      var now = new Date();
+      var h = now.getHours() % 12,
+          m = now.getMinutes(),
+          s = now.getSeconds();
+      var ha = h * Math.PI / 6 + m * Math.PI / 360,
+          ma = m * Math.PI / 30,
+          sa = s * Math.PI / 30;
+
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(128, 128);
+      ctx.lineTo(128 + 60 * Math.sin(ha), 128 - 60 * Math.cos(ha));
+      ctx.stroke();
+
+      ctx.strokeStyle = '#5e9eff';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(128, 128);
+      ctx.lineTo(128 + 85 * Math.sin(ma), 128 - 85 * Math.cos(ma));
+      ctx.stroke();
+
+      ctx.strokeStyle = '#e74c3c';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(128, 128);
+      ctx.lineTo(128 + 95 * Math.sin(sa), 128 - 95 * Math.cos(sa));
+      ctx.stroke();
+
+      ctx.fillStyle = '#5e9eff';
+      ctx.beginPath();
+      ctx.arc(128, 128, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      var el = window.__clockTextureEl;
+      if (el && el.components && el.components.material) {
+        var mat = el.components.material.material;
+        if (mat.map) {
+          mat.map.needsUpdate = true;
+        } else {
+          var tex = new THREE.CanvasTexture(cv);
+          tex.minFilter = THREE.LinearFilter;
+          mat.map = tex;
+          mat.needsUpdate = true;
+        }
       }
     }
 
-    function startClock(){
-      if(window.__clockInterval)clearInterval(window.__clockInterval);
-      tickClock();window.__clockInterval=setInterval(tickClock,1000)
+    function startClock() {
+      if (window.__clockInterval) clearInterval(window.__clockInterval);
+      tickClock();
+      window.__clockInterval = setInterval(tickClock, 1000);
     }
 
-    function setupMusic(content){
-      content.innerHTML='';
-      var nowPlaying=document.createElement('a-text');
-      nowPlaying.id='musicNowPlaying';
-      nowPlaying.setAttribute('value','Aucun morceau chargé');
-      nowPlaying.setAttribute('position','0 0.2 0.01');nowPlaying.setAttribute('color','rgba(255,255,255,0.6)');
-      nowPlaying.setAttribute('align','center');nowPlaying.setAttribute('width','0.7');
-      nowPlaying.setAttribute('scale','0.7 0.7 0.7');
+    function setupMusic(content) {
+      content.innerHTML = '';
+
+      var nowPlaying = document.createElement('a-text');
+      nowPlaying.id = 'musicNowPlaying';
+      nowPlaying.setAttribute('value', 'Aucun morceau charge');
+      nowPlaying.setAttribute('position', '0 0.2 0.01');
+      nowPlaying.setAttribute('color', 'rgba(255,255,255,0.6)');
+      nowPlaying.setAttribute('align', 'center');
+      nowPlaying.setAttribute('width', '0.7');
+      nowPlaying.setAttribute('scale', '0.7 0.7 0.7');
       content.appendChild(nowPlaying);
-      var playBtn=document.createElement('a-plane');
-      playBtn.id='musicPlayBtn';playBtn.className='interactive';
-      playBtn.setAttribute('width','0.2');playBtn.setAttribute('height','0.1');
-      playBtn.setAttribute('position','-0.15 0.05 0.01');playBtn.setAttribute('color','rgba(255,255,255,0.1)');
+
+      var playBtn = document.createElement('a-plane');
+      playBtn.id = 'musicPlayBtn';
+      playBtn.className = 'interactive';
+      playBtn.setAttribute('width', '0.2');
+      playBtn.setAttribute('height', '0.1');
+      playBtn.setAttribute('position', '-0.15 0.05 0.01');
+      playBtn.setAttribute('color', 'rgba(255,255,255,0.1)');
       content.appendChild(playBtn);
-      var playLbl=document.createElement('a-text');
-      playLbl.id='musicPlayLabel';
-      playLbl.setAttribute('value','▶');playLbl.setAttribute('position','0 0 0.01');
-      playLbl.setAttribute('color','#fff');playLbl.setAttribute('align','center');playLbl.setAttribute('width','0.2');
+
+      var playLbl = document.createElement('a-text');
+      playLbl.id = 'musicPlayLabel';
+      playLbl.setAttribute('value', '>');
+      playLbl.setAttribute('position', '0 0 0.01');
+      playLbl.setAttribute('color', '#fff');
+      playLbl.setAttribute('align', 'center');
+      playLbl.setAttribute('width', '0.2');
       playBtn.appendChild(playLbl);
-      var importBtn=document.createElement('a-plane');
-      importBtn.id='musicImportBtn';importBtn.className='interactive';
-      importBtn.setAttribute('width','0.3');importBtn.setAttribute('height','0.1');
-      importBtn.setAttribute('position','0.2 0.05 0.01');importBtn.setAttribute('color','rgba(255,255,255,0.1)');
+
+      var importBtn = document.createElement('a-plane');
+      importBtn.id = 'musicImportBtn';
+      importBtn.className = 'interactive';
+      importBtn.setAttribute('width', '0.3');
+      importBtn.setAttribute('height', '0.1');
+      importBtn.setAttribute('position', '0.2 0.05 0.01');
+      importBtn.setAttribute('color', 'rgba(255,255,255,0.1)');
       content.appendChild(importBtn);
-      var importLbl=document.createElement('a-text');
-      importLbl.setAttribute('value','Importer');importLbl.setAttribute('position','0 0 0.01');
-      importLbl.setAttribute('color','#fff');importLbl.setAttribute('align','center');importLbl.setAttribute('width','0.3');
-      importBtn.appendChild(importLbl);
-      playBtn.addEventListener('click',function(){
-        var audio=document.getElementById('musicAudio');
-        var label=document.getElementById('musicPlayLabel');
-        if(!audio.src||audio.src===''){showNotification('Importez un fichier audio d\'abord');return}
-        if(audio.paused){audio.play();label.setAttribute('value','⏸')}
-        else{audio.pause();label.setAttribute('value','▶')}
+
+      var importlbl = document.createElement('a-text');
+      importlbl.setAttribute('value', 'Importer');
+      importlbl.setAttribute('position', '0 0 0.01');
+      importlbl.setAttribute('color', '#fff');
+      importlbl.setAttribute('align', 'center');
+      importlbl.setAttribute('width', '0.3');
+      importBtn.appendChild(importlbl);
+
+      playBtn.addEventListener('click', function() {
+        var audio = document.getElementById('musicAudio');
+        var label = document.getElementById('musicPlayLabel');
+        if (!audio.src || audio.src === '') {
+          showNotification('Importez un fichier audio d\'abord');
+          return;
+        }
+        if (audio.paused) {
+          audio.play();
+          label.setAttribute('value', '||');
+        } else {
+          audio.pause();
+          label.setAttribute('value', '>');
+        }
       });
-      importBtn.addEventListener('click',function(){document.getElementById('audioInput').click()});
-      var info=document.createElement('a-text');
-      info.setAttribute('value','Importez des fichiers audio (MP3, WAV, OGG)');
-      info.setAttribute('position','0 -0.15 0.01');info.setAttribute('color','rgba(255,255,255,0.3)');
-      info.setAttribute('align','center');info.setAttribute('width','0.7');info.setAttribute('scale','0.6 0.6 0.6');
+
+      importBtn.addEventListener('click', function() {
+        document.getElementById('audioInput').click();
+      });
+
+      var info = document.createElement('a-text');
+      info.setAttribute('value', 'Importez des fichiers audio (MP3, WAV, OGG)');
+      info.setAttribute('position', '0 -0.15 0.01');
+      info.setAttribute('color', 'rgba(255,255,255,0.3)');
+      info.setAttribute('align', 'center');
+      info.setAttribute('width', '0.7');
+      info.setAttribute('scale', '0.6 0.6 0.6');
       content.appendChild(info);
     }
 
-    /* ===== 10. NOTIFICATION ===== */
-    var notifTimeout=null;
-    function showNotification(msg){
-      var n=document.getElementById('dockNotification');
-      n.setAttribute('value',msg);n.setAttribute('visible','true');
-      if(notifTimeout)clearTimeout(notifTimeout);
-      notifTimeout=setTimeout(function(){n.setAttribute('visible','false')},2000)
+    /* ===== 11. NOTIFICATION ===== */
+    var notifTimeout = null;
+
+    function showNotification(msg) {
+      var n = document.getElementById('dockNotification');
+      n.setAttribute('value', msg);
+      n.setAttribute('visible', 'true');
+      if (notifTimeout) clearTimeout(notifTimeout);
+      notifTimeout = setTimeout(function() {
+        n.setAttribute('visible', 'false');
+      }, 2000);
     }
 
-    /* ===== 11. GALERIE INDEXEDDB ===== */
-    var db=null;
-    function openDB(){
-      return new Promise(function(resolve,reject){
-        var req=indexedDB.open('VisionVR_Gallery',1);
-        req.onupgradeneeded=function(e){
-          var d=e.target.result;
-          if(!d.objectStoreNames.contains('media'))d.createObjectStore('media',{keyPath:'id',autoIncrement:true})
+    /* ===== 12. GALERIE INDEXEDDB ===== */
+    var db = null;
+
+    function openDB() {
+      return new Promise(function(resolve, reject) {
+        var req = indexedDB.open('VisionVR_Gallery', 1);
+        req.onupgradeneeded = function(e) {
+          var d = e.target.result;
+          if (!d.objectStoreNames.contains('media'))
+            d.createObjectStore('media', { keyPath: 'id', autoIncrement: true });
         };
-        req.onsuccess=function(e){db=e.target.result;resolve(db)};
-        req.onerror=function(e){reject(e.target.error)}
-      })
-    }
-
-    function loadAllMedia(){
-      return new Promise(function(resolve,reject){
-        if(!db){resolve([]);return}
-        var tx=db.transaction('media','readonly');var store=tx.objectStore('media');
-        var req=store.getAll();
-        req.onsuccess=function(){
-          var items=req.result||[];
-          var oldImgs=document.querySelectorAll('a-image');
-          oldImgs.forEach(function(img){
-            var s=img.getAttribute('src');
-            if(s&&s.startsWith('blob:')){URL.revokeObjectURL(s)}
-          });
-          items.forEach(function(item){
-            if(item.data){item._url=URL.createObjectURL(item.data)}
-          });
-          resolve(items)
+        req.onsuccess = function(e) {
+          db = e.target.result;
+          resolve(db);
         };
-        req.onerror=function(e){reject(e.target.error)}
-      })
+        req.onerror = function(e) {
+          reject(e.target.error);
+        };
+      });
     }
 
-    function saveMedia(name,file,type){
-      return new Promise(function(resolve,reject){
-        if(!db){reject('DB not open');return}
-        var tx=db.transaction('media','readwrite');var store=tx.objectStore('media');
-        var req=store.add({name:name,data:file,type:type,date:Date.now()});
-        req.onsuccess=function(){resolve();refreshGallery()};
-        req.onerror=function(e){reject(e.target.error)}
-      })
-    }
-
-    function deleteMedia(id){
-      return new Promise(function(resolve,reject){
-        if(!db){reject('DB not open');return}
-        var tx=db.transaction('media','readwrite');var store=tx.objectStore('media');
-        var req=store.delete(id);
-        req.onsuccess=function(){refreshGallery();resolve()};
-        req.onerror=function(e){reject(e.target.error)}
-      })
-    }
-
-    function buildGalleryThumbs(items){
-      var container=document.getElementById('galleryContent');container.innerHTML='';
-      if(!items||items.length===0){
-        var empty=document.createElement('a-text');
-        empty.setAttribute('value','Aucun média\nImportez depuis le dock');empty.setAttribute('position','0 0 0.01');
-        empty.setAttribute('color','rgba(255,255,255,0.4)');empty.setAttribute('align','center');empty.setAttribute('width','0.8');
-        container.appendChild(empty);return
-      }
-      var cols=3,spX=0.3,spY=-0.3;
-      items.forEach(function(item,i){
-        var col=i%cols,row=Math.floor(i/cols);
-        var x=(col-(cols-1)/2)*spX,y=row*spY;
-          var isVideo=item.type&&item.type.startsWith('video/');
-        if(item._url){
-          var thumb=document.createElement('a-image');
-          thumb.setAttribute('src',item._url);
-          thumb.setAttribute('width','0.25');thumb.setAttribute('height','0.18');
-          thumb.setAttribute('position',x+' '+y+' 0.01');
-          thumb.setAttribute('data-type',item.type);
-          thumb.className='interactive';
-          thumb.id='galleryThumb_'+item.id;
-          container.appendChild(thumb);
-          var del=document.createElement('a-plane');
-          del.className='interactive';del.setAttribute('width','0.06');del.setAttribute('height','0.06');
-          del.setAttribute('position',(x+0.12)+' '+(y+0.1)+' 0.02');del.setAttribute('color','#c0392b');
-          del.id='galleryDel_'+item.id;
-          container.appendChild(del);
-          var dx=document.createElement('a-text');
-          dx.setAttribute('value','✕');dx.setAttribute('position','0 0 0.01');
-          dx.setAttribute('color','#fff');dx.setAttribute('align','center');dx.setAttribute('width','0.06');
-          del.appendChild(dx)
+    function loadAllMedia() {
+      return new Promise(function(resolve, reject) {
+        if (!db) {
+          resolve([]);
+          return;
         }
-      })
+        var tx = db.transaction('media', 'readonly');
+        var store = tx.objectStore('media');
+        var req = store.getAll();
+        req.onsuccess = function() {
+          var items = req.result || [];
+          var oldImgs = document.querySelectorAll('a-image');
+          oldImgs.forEach(function(img) {
+            var s = img.getAttribute('src');
+            if (s && s.startsWith('blob:')) {
+              URL.revokeObjectURL(s);
+            }
+          });
+          items.forEach(function(item) {
+            if (item.data) {
+              item._url = URL.createObjectURL(item.data);
+            }
+          });
+          resolve(items);
+        };
+        req.onerror = function(e) {
+          reject(e.target.error);
+        };
+      });
     }
 
-    async function refreshGallery(){
-      try{var items=await loadAllMedia();buildGalleryThumbs(items)}
-      catch(e){console.error('Gallery refresh error:',e)}
+    function saveMedia(name, file, type) {
+      return new Promise(function(resolve, reject) {
+        if (!db) {
+          reject('DB not open');
+          return;
+        }
+        var tx = db.transaction('media', 'readwrite');
+        var store = tx.objectStore('media');
+        var req = store.add({ name: name, data: file, type: type, date: Date.now() });
+        req.onsuccess = function() {
+          resolve();
+          refreshGallery();
+        };
+        req.onerror = function(e) {
+          reject(e.target.error);
+        };
+      });
     }
 
-    /* ===== 12. IMAGE VIEWER ===== */
-    function showImageViewer(url){
-      var viewer=document.getElementById('imageViewer');
-      var plane=document.getElementById('imageViewerPlane');
-      viewer.setAttribute('visible','true');viewer.setAttribute('scale','1 1 1');
-      plane.setAttribute('material','src',url)
+    function deleteMedia(id) {
+      return new Promise(function(resolve, reject) {
+        if (!db) {
+          reject('DB not open');
+          return;
+        }
+        var tx = db.transaction('media', 'readwrite');
+        var store = tx.objectStore('media');
+        var req = store.delete(id);
+        req.onsuccess = function() {
+          refreshGallery();
+          resolve();
+        };
+        req.onerror = function(e) {
+          reject(e.target.error);
+        };
+      });
     }
 
-    function closeImageViewer(){
-      var viewer=document.getElementById('imageViewer');
-      viewer.setAttribute('visible','false');viewer.setAttribute('scale','0 0 0')
-    }
+    function buildGalleryThumbs(items) {
+      var container = document.getElementById('galleryContent');
+      container.innerHTML = '';
 
-    /* ===== 13. CINÉMA VR ===== */
-    var videoPlaying=false;
-    var currentVideoUrl=null;
-    function showVideoCinema(url){
-      var cinema=document.getElementById('videoCinema');
-      var cinemaPlane=document.getElementById('cinemaVideo');
-      var videoEl=document.getElementById('videoPlayer');
-      if(!videoEl||!cinemaPlane){closeVideoCinema();return}
-
-      if(currentVideoUrl&&currentVideoUrl!==url){
-        if(currentVideoUrl.startsWith('blob:'))URL.revokeObjectURL(currentVideoUrl);
-        currentVideoUrl=null
+      if (!items || items.length === 0) {
+        var empty = document.createElement('a-text');
+        empty.setAttribute('value', 'Aucun media\nImportez depuis le dock');
+        empty.setAttribute('position', '0 0 0.01');
+        empty.setAttribute('color', 'rgba(255,255,255,0.4)');
+        empty.setAttribute('align', 'center');
+        empty.setAttribute('width', '0.8');
+        container.appendChild(empty);
+        return;
       }
 
-      if(url){
-        var ytMatch=url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-        if(ytMatch){
+      var cols = 3,
+          spX = 0.3,
+          spY = -0.3;
+
+      items.forEach(function(item, i) {
+        var col = i % cols,
+            row = Math.floor(i / cols);
+        var x = (col - (cols - 1) / 2) * spX,
+            y = row * spY;
+
+        if (item._url) {
+          var thumb = document.createElement('a-image');
+          thumb.setAttribute('src', item._url);
+          thumb.setAttribute('width', '0.25');
+          thumb.setAttribute('height', '0.18');
+          thumb.setAttribute('position', x + ' ' + y + ' 0.01');
+          thumb.setAttribute('data-type', item.type);
+          thumb.className = 'interactive';
+          thumb.id = 'galleryThumb_' + item.id;
+          container.appendChild(thumb);
+
+          var del = document.createElement('a-plane');
+          del.className = 'interactive';
+          del.setAttribute('width', '0.06');
+          del.setAttribute('height', '0.06');
+          del.setAttribute('position', (x + 0.12) + ' ' + (y + 0.1) + ' 0.02');
+          del.setAttribute('color', '#c0392b');
+          del.id = 'galleryDel_' + item.id;
+          container.appendChild(del);
+
+          var dx = document.createElement('a-text');
+          dx.setAttribute('value', 'X');
+          dx.setAttribute('position', '0 0 0.01');
+          dx.setAttribute('color', '#fff');
+          dx.setAttribute('align', 'center');
+          dx.setAttribute('width', '0.06');
+          del.appendChild(dx);
+        }
+      });
+    }
+
+    async function refreshGallery() {
+      try {
+        var items = await loadAllMedia();
+        buildGalleryThumbs(items);
+      } catch (e) {
+        console.error('Gallery refresh error:', e);
+      }
+    }
+
+    /* ===== 13. IMAGE VIEWER ===== */
+    function showImageViewer(url) {
+      var viewer = document.getElementById('imageViewer');
+      var plane = document.getElementById('imageViewerPlane');
+      viewer.setAttribute('visible', 'true');
+      viewer.setAttribute('scale', '1 1 1');
+      plane.setAttribute('material', 'src', url);
+    }
+
+    function closeImageViewer() {
+      var viewer = document.getElementById('imageViewer');
+      viewer.setAttribute('visible', 'false');
+      viewer.setAttribute('scale', '0 0 0');
+    }
+
+    /* ===== 14. CINEMA VR ===== */
+    var videoPlaying = false;
+    var currentVideoUrl = null;
+
+    function showVideoCinema(url) {
+      var cinema = document.getElementById('videoCinema');
+      var cinemaPlane = document.getElementById('cinemaVideo');
+      var videoEl = document.getElementById('videoPlayer');
+      if (!videoEl || !cinemaPlane) {
+        closeVideoCinema();
+        return;
+      }
+
+      if (currentVideoUrl && currentVideoUrl !== url) {
+        if (currentVideoUrl.startsWith('blob:')) URL.revokeObjectURL(currentVideoUrl);
+        currentVideoUrl = null;
+      }
+
+      if (url) {
+        var ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        if (ytMatch) {
           openWindow('safari');
           loadURL(url);
-          return
+          return;
         }
       }
 
-      currentVideoUrl=url;
-
+      currentVideoUrl = url;
       closeWindow('gallery');
-      var dock=document.getElementById('spatialMenu');
-      if(dock)dock.setAttribute('visible','false');
+      var dock = document.getElementById('spatialMenu');
+      if (dock) dock.setAttribute('visible', 'false');
 
-      var mesh=cinemaPlane.getObject3D('mesh');
-      if(mesh&&mesh.material){
-        if(mesh.material.map){mesh.material.map=null;mesh.material.map=undefined}
+      var mesh = cinemaPlane.getObject3D('mesh');
+      if (mesh && mesh.material) {
+        if (mesh.material.map) {
+          mesh.material.map = null;
+          mesh.material.map = undefined;
+        }
         mesh.material.color.set('#000000');
-        mesh.material.needsUpdate=true
+        mesh.material.needsUpdate = true;
       }
 
-      videoEl.src=url;
+      videoEl.src = url;
       videoEl.load();
 
-      document.getElementById('cinemaTapOverlay').style.display='flex';
-      videoPlaying=false;
+      document.getElementById('cinemaTapOverlay').style.display = 'flex';
+      videoPlaying = false;
 
-      var onReady=function(){
-        videoEl.removeEventListener('loadeddata',onReady);
-        videoEl.removeEventListener('canplay',onReady);
+      var onReady = function() {
+        videoEl.removeEventListener('loadeddata', onReady);
+        videoEl.removeEventListener('canplay', onReady);
 
-        var texture=new THREE.VideoTexture(videoEl);
-        texture.minFilter=THREE.LinearFilter;
-        texture.magFilter=THREE.LinearFilter;
-        texture.format=THREE.RGBAFormat;
-        texture.needsUpdate=true;
+        var texture = new THREE.VideoTexture(videoEl);
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.format = THREE.RGBAFormat;
+        texture.needsUpdate = true;
 
-        if(mesh&&mesh.material){
-          mesh.material.map=texture;
+        if (mesh && mesh.material) {
+          mesh.material.map = texture;
           mesh.material.color.set('#ffffff');
-          mesh.material.transparent=false;
-          mesh.material.needsUpdate=true
+          mesh.material.transparent = false;
+          mesh.material.needsUpdate = true;
         }
 
-        var pos=spawnInFrontOfCamera(2,1.6);
-        cinema.setAttribute('position',pos.x+' '+pos.y+' '+pos.z);
-        cinema.setAttribute('visible','true');
+        var pos = spawnInFrontOfCamera(2, 1.6);
+        cinema.setAttribute('position', pos.x + ' ' + pos.y + ' ' + pos.z);
+        cinema.setAttribute('visible', 'true');
 
-        var playPromise=videoEl.play();
-        if(playPromise!==undefined){
-          playPromise.then(function(){videoPlaying=true;document.getElementById('cinemaTapOverlay').style.display='none'}).catch(function(){})
+        var playPromise = videoEl.play();
+        if (playPromise !== undefined) {
+          playPromise.then(function() {
+            videoPlaying = true;
+            document.getElementById('cinemaTapOverlay').style.display = 'none';
+          }).catch(function() {});
         }
       };
-      videoEl.addEventListener('loadeddata',onReady);
-      videoEl.addEventListener('canplay',onReady)
+      videoEl.addEventListener('loadeddata', onReady);
+      videoEl.addEventListener('canplay', onReady);
     }
 
-    function toggleVideoPlay(){
-      var video=document.getElementById('videoPlayer');
-      if(!video)return;
-      if(videoPlaying){video.pause();videoPlaying=false}
-      else{
-        var p=video.play();
-        if(p!==undefined)p.then(function(){videoPlaying=true}).catch(function(){})
+    function toggleVideoPlay() {
+      var video = document.getElementById('videoPlayer');
+      if (!video) return;
+      if (videoPlaying) {
+        video.pause();
+        videoPlaying = false;
+      } else {
+        var p = video.play();
+        if (p !== undefined)
+          p.then(function() {
+            videoPlaying = true;
+          }).catch(function() {});
       }
     }
 
-    function closeVideoCinema(){
-      var cinema=document.getElementById('videoCinema');
-      var cinemaPlane=document.getElementById('cinemaVideo');
-      var videoEl=document.getElementById('videoPlayer');
-      if(videoEl){videoEl.pause();videoEl.removeAttribute('src');videoEl.load()}
-      var mesh=cinemaPlane.getObject3D('mesh');
-      if(mesh&&mesh.material){
-        if(mesh.material.map){mesh.material.map=null;mesh.material.map=undefined}
+    function closeVideoCinema() {
+      var cinema = document.getElementById('videoCinema');
+      var cinemaPlane = document.getElementById('cinemaVideo');
+      var videoEl = document.getElementById('videoPlayer');
+      if (videoEl) {
+        videoEl.pause();
+        videoEl.removeAttribute('src');
+        videoEl.load();
+      }
+      var mesh = cinemaPlane.getObject3D('mesh');
+      if (mesh && mesh.material) {
+        if (mesh.material.map) {
+          mesh.material.map = null;
+          mesh.material.map = undefined;
+        }
         mesh.material.color.set('#000000');
-        mesh.material.needsUpdate=true
+        mesh.material.needsUpdate = true;
       }
-      videoPlaying=false;cinema.setAttribute('visible','false');
-      document.getElementById('cinemaTapOverlay').style.display='none';
-      var dock=document.getElementById('spatialMenu');
-      if(dock)dock.setAttribute('visible','true');
-      if(currentVideoUrl&&currentVideoUrl.startsWith('blob:')){URL.revokeObjectURL(currentVideoUrl);currentVideoUrl=null}
+      videoPlaying = false;
+      cinema.setAttribute('visible', 'false');
+      document.getElementById('cinemaTapOverlay').style.display = 'none';
+      var dock = document.getElementById('spatialMenu');
+      if (dock) dock.setAttribute('visible', 'true');
+      if (currentVideoUrl && currentVideoUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(currentVideoUrl);
+        currentVideoUrl = null;
+      }
     }
 
-    /* ===== 14. COMPOSANTS A-FRAME ===== */
-    AFRAME.registerComponent('resize-handler',{
-      init:function(){
-        var self=this;
-        this.el.addEventListener('click',function(){
-          var s=self.el.getAttribute('scale');
-          if(self.el.id&&self.el.id.indexOf('Left')!==-1||self.el.id.indexOf('Minus')!==-1){
-            self.el.sceneEl.querySelector('a-camera').setAttribute('wasd-controls','enabled:false');
-            showNotification('Échelle réduite')
+    /* ===== 15. COMPOSANTS A-FRAME - RESIZE DYNAMIQUE ===== */
+    AFRAME.registerComponent('resize-handler', {
+      init: function() {
+        var self = this;
+        this.el.addEventListener('click', function() {
+          if (self.el.id && (self.el.id.indexOf('Left') !== -1 || self.el.id.indexOf('Minus') !== -1)) {
+            self.el.sceneEl.querySelector('a-camera').setAttribute('wasd-controls', 'enabled:false');
+            showNotification('Echelle reduite');
           } else {
-            showNotification('Échelle agrandie')
-          }
-        })
-      }
-    });
-
-    AFRAME.registerComponent('resize-btn-handler',{
-      init:function(){
-        var self=this;
-        this.el.addEventListener('click',function(){
-          var diff=self.el.id.indexOf('Minus')!==-1?-0.2:0.2;
-          var menu=document.getElementById('spatialMenu');
-          var s=menu.getAttribute('scale').split(' ').map(Number);
-          var ns=Math.max(0.3,Math.min(2,s[0]+diff));
-          menu.setAttribute('scale',ns+' '+ns+' '+ns)
-        })
-      }
-    });
-
-    AFRAME.registerComponent('cycle-handler',{
-      init:function(){this.el.addEventListener('click',function(){cycleEnvironment()})}
-    });
-
-    AFRAME.registerComponent('widget-handler',{
-      init:function(){
-        var self=this;
-        this.el.addEventListener('click',function(){
-          var id=self.el.id;var app=id.replace('widget_','');
-          if(appActions[app])appActions[app].action()
-        })
-      }
-    });
-
-    /* ===== 15. ATTACHEMENT COMPOSANTS ===== */
-    function attachComponents(){
-      try{
-        document.querySelectorAll('#resizeMinus3d,#resizePlus3d').forEach(function(el){
-          if(!el.hasAttribute('resize-btn-handler'))el.setAttribute('resize-btn-handler','')
-        });
-        var cycleEl=document.getElementById('cycleBtn3d');
-        if(cycleEl&&!cycleEl.hasAttribute('cycle-handler'))cycleEl.setAttribute('cycle-handler','');
-
-        var closeMap={gallery:'galleryClose',safari:'safariClose',games:'gamesClose',weather:'weatherClose',clock:'clockClose',music:'musicClose'};
-        Object.keys(closeMap).forEach(function(k){
-          var el=document.getElementById(closeMap[k]);
-          if(el&&el.classList.contains('interactive')){
-            el.addEventListener('click',function(){closeWindow(k)})
+            showNotification('Echelle agrandie');
           }
         });
+      }
+    });
 
-        document.addEventListener('mousedown',function(){
-          var raycaster=document.querySelector('a-cursor');
-          if(!raycaster||!raycaster.components||!raycaster.components.raycaster)return;
-          var el=raycaster.components.raycaster.intersectedEl;
-          if(!el)return;
-          if(el.id==='galleryImportBtn'||(el.closest&&el.closest('#galleryImportBtn'))){
-            document.getElementById('filePickerOverlay').style.display='flex'
+    // Composant de redimensionnement dynamique du dock avec texture Glassmorphism
+    AFRAME.registerComponent('resize-btn-handler', {
+      init: function() {
+        var self = this;
+        this.el.addEventListener('click', function() {
+          var isMinus = self.el.id.indexOf('Minus') !== -1;
+          var widthStep = 0.4; // Increment de 0.4
+
+          // Modifier directement la largeur du dock
+          if (isMinus) {
+            dockConfig.width = Math.max(2.0, dockConfig.width - widthStep);
+          } else {
+            dockConfig.width = Math.min(5.0, dockConfig.width + widthStep);
           }
-          if(el.id==='musicImportBtn'||(el.closest&&el.closest('#musicImportBtn'))){
-            document.getElementById('audioInput').click()
+
+          // Mettre a jour les textures et les elements du dock
+          updateDockTextures();
+
+          // Notification
+          showNotification('Largeur: ' + dockConfig.width.toFixed(1) + 'm');
+        });
+      }
+    });
+
+    AFRAME.registerComponent('cycle-handler', {
+      init: function() {
+        this.el.addEventListener('click', function() {
+          cycleEnvironment();
+        });
+      }
+    });
+
+    AFRAME.registerComponent('widget-handler', {
+      init: function() {
+        var self = this;
+        this.el.addEventListener('click', function() {
+          var id = self.el.id;
+          var app = id.replace('widget_', '');
+          if (appActions[app]) appActions[app].action();
+        });
+      }
+    });
+
+    /* ===== 16. ATTACHEMENT COMPOSANTS ===== */
+    function attachComponents() {
+      try {
+        document.querySelectorAll('#resizeMinus3d,#resizePlus3d').forEach(function(el) {
+          if (!el.hasAttribute('resize-btn-handler')) el.setAttribute('resize-btn-handler', '');
+        });
+
+        var cycleEl = document.getElementById('cycleBtn3d');
+        if (cycleEl && !cycleEl.hasAttribute('cycle-handler')) cycleEl.setAttribute('cycle-handler', '');
+
+        var closeMap = {
+          gallery: 'galleryClose',
+          safari: 'safariClose',
+          games: 'gamesClose',
+          weather: 'weatherClose',
+          clock: 'clockClose',
+          music: 'musicClose'
+        };
+        Object.keys(closeMap).forEach(function(k) {
+          var el = document.getElementById(closeMap[k]);
+          if (el && el.classList.contains('interactive')) {
+            el.addEventListener('click', function() {
+              closeWindow(k);
+            });
           }
-          var thumb=el;
-          if(thumb.id&&thumb.id.startsWith('galleryThumb_')){
-            var type=thumb.getAttribute('data-type');
-            if(type&&type.startsWith('video/')){
-              var src=thumb.getAttribute('src');
-              if(src)showVideoCinema(src)
+        });
+
+        document.addEventListener('mousedown', function() {
+          var raycaster = document.querySelector('a-cursor');
+          if (!raycaster || !raycaster.components || !raycaster.components.raycaster) return;
+          var el = raycaster.components.raycaster.intersectedEl;
+          if (!el) return;
+
+          if (el.id === 'galleryImportBtn' || (el.closest && el.closest('#galleryImportBtn'))) {
+            document.getElementById('filePickerOverlay').style.display = 'flex';
+          }
+          if (el.id === 'musicImportBtn' || (el.closest && el.closest('#musicImportBtn'))) {
+            document.getElementById('audioInput').click();
+          }
+
+          var thumb = el;
+          if (thumb.id && thumb.id.startsWith('galleryThumb_')) {
+            var type = thumb.getAttribute('data-type');
+            if (type && type.startsWith('video/')) {
+              var src = thumb.getAttribute('src');
+              if (src) showVideoCinema(src);
             }
           }
-          var cinema=document.getElementById('videoCinema');
-          if(cinema&&cinema.getAttribute('visible')==='true'&&!videoPlaying){
-            toggleVideoPlay()
+
+          var cinema = document.getElementById('videoCinema');
+          if (cinema && cinema.getAttribute('visible') === 'true' && !videoPlaying) {
+            toggleVideoPlay();
           }
         });
 
-        document.getElementById('fileInput').addEventListener('change',async function(){
-          document.getElementById('filePickerOverlay').style.display='none';
-          var files=Array.from(this.files);
-          for(var f of files){
-            try{await saveMedia(f.name,f,f.type)}catch(e){console.error('Save error:',e)}
+        document.getElementById('fileInput').addEventListener('change', async function() {
+          document.getElementById('filePickerOverlay').style.display = 'none';
+          var files = Array.from(this.files);
+          for (var f of files) {
+            try {
+              await saveMedia(f.name, f, f.type);
+            } catch (e) {
+              console.error('Save error:', e);
+            }
           }
-          this.value=''
+          this.value = '';
         });
 
-        document.getElementById('audioInput').addEventListener('change',function(){
-          var files=this.files;if(!files.length)return;
-          var file=files[0];var url=URL.createObjectURL(file);
-          var audio=document.getElementById('musicAudio');
-          audio.src=url;audio.load();
-          document.getElementById('musicNowPlaying').setAttribute('value',file.name);
-          document.getElementById('musicPlayLabel').setAttribute('value','⏸');
+        document.getElementById('audioInput').addEventListener('change', function() {
+          var files = this.files;
+          if (!files.length) return;
+          var file = files[0];
+          var url = URL.createObjectURL(file);
+          var audio = document.getElementById('musicAudio');
+          audio.src = url;
+          audio.load();
+          document.getElementById('musicNowPlaying').setAttribute('value', file.name);
+          document.getElementById('musicPlayLabel').setAttribute('value', '||');
           audio.play();
-          this.value=''
+          this.value = '';
         });
 
-        document.getElementById('galleryContent').addEventListener('click',function(e){
-          var el=e.target;
-          if(!el)return;
-          var id=el.id||(el.parentElement&&el.parentElement.id);
-          if(!id)return;
-          if(id.startsWith('galleryDel_')){
-            deleteMedia(parseInt(id.replace('galleryDel_','')))
-          } else if(id.startsWith('galleryThumb_')){
-            var src=document.getElementById(id).getAttribute('src');
-            if(src){
-              var type=document.getElementById(id).getAttribute('data-type');
-              if(type&&type.startsWith('video/'))showVideoCinema(src)
-              else showImageViewer(src)
+        document.getElementById('galleryContent').addEventListener('click', function(e) {
+          var el = e.target;
+          if (!el) return;
+          var id = el.id || (el.parentElement && el.parentElement.id);
+          if (!id) return;
+
+          if (id.startsWith('galleryDel_')) {
+            deleteMedia(parseInt(id.replace('galleryDel_', '')));
+          } else if (id.startsWith('galleryThumb_')) {
+            var src = document.getElementById(id).getAttribute('src');
+            if (src) {
+              var type = document.getElementById(id).getAttribute('data-type');
+              if (type && type.startsWith('video/'))
+                showVideoCinema(src);
+              else
+                showImageViewer(src);
             }
           }
         });
 
-        var gib=document.getElementById('galleryImportBtn');
-        if(gib&&gib.classList.contains('interactive')){
-          gib.addEventListener('click',function(){
-            document.getElementById('filePickerOverlay').style.display='flex'
-          })
+        var gib = document.getElementById('galleryImportBtn');
+        if (gib && gib.classList.contains('interactive')) {
+          gib.addEventListener('click', function() {
+            document.getElementById('filePickerOverlay').style.display = 'flex';
+          });
         }
 
-        document.querySelector('#filePickerOverlay .picker-bg').addEventListener('click',function(){
-          document.getElementById('filePickerOverlay').style.display='none'
+        document.querySelector('#filePickerOverlay .picker-bg').addEventListener('click', function() {
+          document.getElementById('filePickerOverlay').style.display = 'none';
         });
 
-        var ivc=document.getElementById('imageViewerClose');
-        if(ivc&&ivc.classList.contains('interactive'))ivc.addEventListener('click',closeImageViewer);
+        var ivc = document.getElementById('imageViewerClose');
+        if (ivc && ivc.classList.contains('interactive')) ivc.addEventListener('click', closeImageViewer);
 
-        var vp=document.getElementById('videoPlayBtn');
-        if(vp&&vp.classList.contains('interactive'))vp.addEventListener('click',toggleVideoPlay);
-        var vc=document.getElementById('videoCloseBtn');
-        if(vc&&vc.classList.contains('interactive'))vc.addEventListener('click',closeVideoCinema);
+        var vp = document.getElementById('videoPlayBtn');
+        if (vp && vp.classList.contains('interactive')) vp.addEventListener('click', toggleVideoPlay);
+        var vc = document.getElementById('videoCloseBtn');
+        if (vc && vc.classList.contains('interactive')) vc.addEventListener('click', closeVideoCinema);
 
-        document.getElementById('cinemaTapBtn').addEventListener('click',function(){
+        document.getElementById('cinemaTapBtn').addEventListener('click', function() {
           toggleVideoPlay();
-          document.getElementById('cinemaTapOverlay').style.display='none'
+          document.getElementById('cinemaTapOverlay').style.display = 'none';
         });
 
-      }catch(e){console.error('attachComponents error:',e)}
+      } catch (e) {
+        console.error('attachComponents error:', e);
+      }
     }
 
-    /* ===== 16. INITIALISATION ===== */
-    var scaleValue=1;
-    function updateUI(){}
+    /* ===== 17. INITIALISATION ===== */
+    function init() {
+      try {
+        // Initialiser les textures Glassmorphism du dock
+        updateDockTextures();
 
-    function init(){
-      try{
-        var glassUri=createRoundedRectTexture(2.6,0.56,0.03,'rgba(30,30,40,0.75)','rgba(255,255,255,0.1)',1.5);
-        var borderUri=createRoundedRectTexture(2.6,0.56,0.03,null,'rgba(255,255,255,0.2)',2);
-        var shadowUri=createShadowTexture(2.6,0.56,0.03);
-        document.getElementById('dockGlass').setAttribute('material','src',glassUri);
-        document.getElementById('dockBorder').setAttribute('material','src',borderUri);
-        document.getElementById('dockShadow').setAttribute('material','src',shadowUri);
+        // Grille de texture
+        var gridUri = createGridTexture();
+        var gridImg = document.getElementById('gridTex');
+        if (gridImg) gridImg.setAttribute('src', gridUri);
 
-        var gridUri=createGridTexture();
-        var gridImg=document.getElementById('gridTex');
-        if(gridImg)gridImg.setAttribute('src',gridUri);
-
+        // Construire les widgets et fenetres
         buildWidgets();
         buildAppWindows();
 
-        windowInit.safari=function(){setupSafari(document.getElementById('safariContent'))};
-        windowInit.games=function(){setupGames(document.getElementById('gamesContent'))};
-        windowInit.weather=function(){setupWeather(document.getElementById('weatherContent'))};
-        windowInit.clock=function(){
-          setupClock(document.getElementById('clockContent'));
-          setTimeout(startClock,100)
+        // Setup des fenetres d'applications
+        windowInit.safari = function() {
+          setupSafari(document.getElementById('safariContent'));
         };
-        windowInit.music=function(){setupMusic(document.getElementById('musicContent'))};
+        windowInit.games = function() {
+          setupGames(document.getElementById('gamesContent'));
+        };
+        windowInit.weather = function() {
+          setupWeather(document.getElementById('weatherContent'));
+        };
+        windowInit.clock = function() {
+          setupClock(document.getElementById('clockContent'));
+          setTimeout(startClock, 100);
+        };
+        windowInit.music = function() {
+          setupMusic(document.getElementById('musicContent'));
+        };
 
+        // Environnements
         buildDots();
         setEnvironment(0);
 
-        openDB().then(function(){refreshGallery()}).catch(function(e){console.error('DB error:',e)});
-        updateUI();
+        // Base de donnees galerie
+        openDB().then(function() {
+          refreshGallery();
+        }).catch(function(e) {
+          console.error('DB error:', e);
+        });
 
-        var scene=document.querySelector('a-scene');
-        if(scene.hasLoaded){attachComponents()}
-        else{scene.addEventListener('loaded',attachComponents)}
+        // Attachement des composants
+        var scene = document.querySelector('a-scene');
+        if (scene.hasLoaded) {
+          attachComponents();
+        } else {
+          scene.addEventListener('loaded', attachComponents);
+        }
 
-      }catch(e){console.error('init error:',e)}
+      } catch (e) {
+        console.error('init error:', e);
+      }
     }
 
-    if(document.readyState==='complete'){init()}
-    else{document.addEventListener('DOMContentLoaded',init)}
+    if (document.readyState === 'complete') {
+      init();
+    } else {
+      document.addEventListener('DOMContentLoaded', init);
+    }
 
-    window.addEventListener('beforeunload',function(){
-      var imgs=document.querySelectorAll('a-image');
-      imgs.forEach(function(img){
-        var src=img.getAttribute('src');
-        if(src&&src.startsWith('blob:'))URL.revokeObjectURL(src)
+    // Cleanup
+    window.addEventListener('beforeunload', function() {
+      var imgs = document.querySelectorAll('a-image');
+      imgs.forEach(function(img) {
+        var src = img.getAttribute('src');
+        if (src && src.startsWith('blob:')) URL.revokeObjectURL(src);
       });
-      if(currentVideoUrl&&currentVideoUrl.startsWith('blob:')){URL.revokeObjectURL(currentVideoUrl);currentVideoUrl=null}
-      var audio=document.getElementById('musicAudio');
-      if(audio&&audio.src&&audio.src.startsWith('blob:')){URL.revokeObjectURL(audio.src)}
+      if (currentVideoUrl && currentVideoUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(currentVideoUrl);
+        currentVideoUrl = null;
+      }
+      var audio = document.getElementById('musicAudio');
+      if (audio && audio.src && audio.src.startsWith('blob:')) {
+        URL.revokeObjectURL(audio.src);
+      }
     });
     </script>
   </body>
