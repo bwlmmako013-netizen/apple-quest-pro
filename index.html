@@ -120,109 +120,148 @@
           this.el.emit('drag-start', { target: this.targetEl, pointer: pointerEl }, false);
         },
         onUp: function () { this.endDrag(); },
-        onSceneUp: function () { this.endDrag(); },
-        tick: function () {
-          if (!this.dragging || !this.pointerEl || !this.targetEl) return;
-          if (!updatePointerRay(this.pointerEl, pointerRay)) return;
-          targetWorldPosition.copy(pointerRay.origin)
-            .add(pointerRay.direction.clone().multiplyScalar(this.dragDistance))
-            .add(this.grabOffset);
-          getWorldTargetPosition(this.targetEl, targetWorldPosition, this.localPosition);
-          this.targetEl.object3D.position.copy(this.localPosition);
-          this.targetEl.object3D.matrixWorldNeedsUpdate = true;
-          if (this.data.faceCamera && this.el.sceneEl && this.el.sceneEl.camera) {
-            this.el.sceneEl.camera.getWorldPosition(this.cameraWorldPosition);
-            this.targetEl.object3D.lookAt(this.cameraWorldPosition);
-          }
-          this.el.emit('drag-move', { target: this.targetEl, pointer: this.pointerEl }, false);
-        },
-        endDrag: function () {
-          if (!this.dragging) return;
-          this.dragging = false;
-          this.el.emit('drag-end', { target: this.targetEl, pointer: this.pointerEl }, false);
-          this.pointerEl = null;
-          this.targetEl = null;
-          if (activeDrag === this) activeDrag = null;
-        }
-      });
-    }();
-    </script>
-        <!-- Script Stereo Mode -->
-        <script>
-    (function () {
-      if (typeof AFRAME === 'undefined' || typeof THREE === 'undefined') return;
-      AFRAME.registerComponent('stereo-mode', {
-        init: function () {
-          var sceneEl = this.el;
-          var renderer = sceneEl.renderer;
-          if (!renderer || renderer.__stereoModeOriginalRender) return;
-          var stereoCamera = new THREE.StereoCamera();
-          var originalRender = renderer.render.bind(renderer);
-          var renderingStereoEye = false;
-          renderer.__stereoModeOriginalRender = originalRender;
-          renderer.render = function (scene, camera) {
-            if (renderingStereoEye || !scene || !camera) return originalRender(scene, camera);
-            var size = renderer.getSize(new THREE.Vector2());
-            var width = size.width, height = size.height, halfWidth = width / 2;
-            var currentViewport = renderer.getViewport(new THREE.Vector4());
-            var currentScissor = renderer.getScissor(new THREE.Vector4());
-            var currentScissorTest = renderer.getScissorTest();
-            var currentAutoClear = renderer.autoClear;
-            if (camera.parent === null && sceneEl.camera && sceneEl.camera.parent) sceneEl.camera.parent.updateMatrixWorld();
-            scene.updateMatrixWorld();
-            if (camera.parent === null) camera.updateMatrixWorld();
-            stereoCamera.update(camera);
-            renderer.autoClear = false;
-            renderer.setScissorTest(true);
-            renderer.clear();
-            renderingStereoEye = true;
-            renderer.setScissor(0, 0, halfWidth, height);
-            renderer.setViewport(0, 0, halfWidth, height);
-            originalRender(scene, stereoCamera.cameraL);
-            renderer.setScissor(halfWidth, 0, halfWidth, height);
-            renderer.setViewport(halfWidth, 0, halfWidth, height);
-            originalRender(scene, stereoCamera.cameraR);
-            renderingStereoEye = false;
-            renderer.setViewport(currentViewport);
-            renderer.setScissor(currentScissor);
-            renderer.setScissorTest(currentScissorTest);
-            renderer.autoClear = currentAutoClear;
-          };
-        },
-        remove: function () {
-          var renderer = this.el.renderer;
-          if (renderer && renderer.__stereoModeOriginalRender) {
-            renderer.render = renderer.__stereoModeOriginalRender;
-            delete renderer.__stereoModeOriginalRender;
-          }
-        }
-      });
-    }();
-    </script>
-        <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { overflow: hidden; background: #000; font-family: -apple-system, system-ui, sans-serif; }
-      #fileInput { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 202; }
-      #audioInput { position: fixed; left: -9999px; opacity: 0; width: 1px; height: 1px; }
-      #filePickerOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; display: none; align-items: center; justify-content: center; }
-      #filePickerOverlay .picker-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); }
-      #filePickerBtn { position: relative; background: #5e9eff; color: #fff; border: none; padding: 14px 32px; border-radius: 12px; font-size: 18px; font-weight: 600; cursor: pointer; z-index: 201; box-shadow: 0 4px 20px rgba(94,158,255,0.4); }
-      #cinemaTapOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 300; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); }
-      #cinemaTapBtn { background: #5e9eff; color: #fff; border: none; padding: 18px 40px; border-radius: 16px; font-size: 20px; font-weight: 600; cursor: pointer; z-index: 301; box-shadow: 0 4px 24px rgba(0,0,0,0.6); }
-      .a-canvas { z-index: 1; }
-    </style>
-      </head>
-      <body>
-        <a-scene stereo-mode vr-mode-ui="enabled: true" background="color: #111" loading-screen="enabled: false" renderer="antialias: true; colorManagement: true; maxCanvasWidth: 2048; maxCanvasHeight: 2048">
-        <a-assets>
-        <video id="videoPlayer" crossorigin="anonymous" playsinline webkit-playsinline preload="auto">
-        </video>
-        <img id="gridTex" crossorigin="anonymous" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==">
-        </a-assets>
-        <a-camera position="0 1.6 0" wasd-controls="enabled: false">
-        <a-cursor fuse="true" fuse-timeout="1000" cursor="fuseTick: true" material="color: #5e9eff; opacity: 0.4" raycaster="objects: .interactive; far: 10">
-      </a-cursor>
-    </a-camera>
+       diff --git a/index.html b/index.html
+index 959a60fee9d7493c86f95d9c402a0e64081d3237..32dff7de19e698ae69fa5a06fce14a0a6a251911 100644
+--- a/index.html
++++ b/index.html
+@@ -123,103 +123,123 @@
+         onSceneUp: function () { this.endDrag(); },
+         tick: function () {
+           if (!this.dragging || !this.pointerEl || !this.targetEl) return;
+           if (!updatePointerRay(this.pointerEl, pointerRay)) return;
+           targetWorldPosition.copy(pointerRay.origin)
+             .add(pointerRay.direction.clone().multiplyScalar(this.dragDistance))
+             .add(this.grabOffset);
+           getWorldTargetPosition(this.targetEl, targetWorldPosition, this.localPosition);
+           this.targetEl.object3D.position.copy(this.localPosition);
+           this.targetEl.object3D.matrixWorldNeedsUpdate = true;
+           if (this.data.faceCamera && this.el.sceneEl && this.el.sceneEl.camera) {
+             this.el.sceneEl.camera.getWorldPosition(this.cameraWorldPosition);
+             this.targetEl.object3D.lookAt(this.cameraWorldPosition);
+           }
+           this.el.emit('drag-move', { target: this.targetEl, pointer: this.pointerEl }, false);
+         },
+         endDrag: function () {
+           if (!this.dragging) return;
+           this.dragging = false;
+           this.el.emit('drag-end', { target: this.targetEl, pointer: this.pointerEl }, false);
+           this.pointerEl = null;
+           this.targetEl = null;
+           if (activeDrag === this) activeDrag = null;
+         }
+       });
+-    }();
++    }());
+     </script>
+         <!-- Script Stereo Mode -->
+         <script>
+     (function () {
+       if (typeof AFRAME === 'undefined' || typeof THREE === 'undefined') return;
+       AFRAME.registerComponent('stereo-mode', {
+         init: function () {
+           var sceneEl = this.el;
+           var renderer = sceneEl.renderer;
+           if (!renderer || renderer.__stereoModeOriginalRender) return;
+           var stereoCamera = new THREE.StereoCamera();
+           var originalRender = renderer.render.bind(renderer);
+           var renderingStereoEye = false;
+           renderer.__stereoModeOriginalRender = originalRender;
+           renderer.render = function (scene, camera) {
+             if (renderingStereoEye || !scene || !camera) return originalRender(scene, camera);
+             var size = renderer.getSize(new THREE.Vector2());
+-            var width = size.width, height = size.height, halfWidth = width / 2;
++            var width = Math.floor(size.width), height = Math.floor(size.height);
++            var leftWidth = Math.floor(width / 2), rightWidth = width - leftWidth;
++            var eyeAspect = leftWidth / height;
+             var currentViewport = renderer.getViewport(new THREE.Vector4());
+             var currentScissor = renderer.getScissor(new THREE.Vector4());
+             var currentScissorTest = renderer.getScissorTest();
+             var currentAutoClear = renderer.autoClear;
++            var originalAspect = camera.aspect;
+             if (camera.parent === null && sceneEl.camera && sceneEl.camera.parent) sceneEl.camera.parent.updateMatrixWorld();
+             scene.updateMatrixWorld();
+             if (camera.parent === null) camera.updateMatrixWorld();
++            if (camera.isPerspectiveCamera && height > 0 && leftWidth > 0) {
++              camera.aspect = eyeAspect;
++              camera.updateProjectionMatrix();
++              stereoCamera.cameraL.aspect = eyeAspect;
++              stereoCamera.cameraR.aspect = eyeAspect;
++              stereoCamera.cameraL.updateProjectionMatrix();
++              stereoCamera.cameraR.updateProjectionMatrix();
++            }
+             stereoCamera.update(camera);
++            stereoCamera.cameraL.projectionMatrixInverse.copy(stereoCamera.cameraL.projectionMatrix).invert();
++            stereoCamera.cameraR.projectionMatrixInverse.copy(stereoCamera.cameraR.projectionMatrix).invert();
+             renderer.autoClear = false;
+             renderer.setScissorTest(true);
+             renderer.clear();
+             renderingStereoEye = true;
+-            renderer.setScissor(0, 0, halfWidth, height);
+-            renderer.setViewport(0, 0, halfWidth, height);
+-            originalRender(scene, stereoCamera.cameraL);
+-            renderer.setScissor(halfWidth, 0, halfWidth, height);
+-            renderer.setViewport(halfWidth, 0, halfWidth, height);
+-            originalRender(scene, stereoCamera.cameraR);
+-            renderingStereoEye = false;
+-            renderer.setViewport(currentViewport);
+-            renderer.setScissor(currentScissor);
+-            renderer.setScissorTest(currentScissorTest);
+-            renderer.autoClear = currentAutoClear;
++            try {
++              renderer.setScissor(0, 0, leftWidth, height);
++              renderer.setViewport(0, 0, leftWidth, height);
++              originalRender(scene, stereoCamera.cameraL);
++              renderer.setScissor(leftWidth, 0, rightWidth, height);
++              renderer.setViewport(leftWidth, 0, rightWidth, height);
++              originalRender(scene, stereoCamera.cameraR);
++            } finally {
++              renderingStereoEye = false;
++              if (camera.isPerspectiveCamera && originalAspect !== undefined) {
++                camera.aspect = originalAspect;
++                camera.updateProjectionMatrix();
++              }
++              renderer.setViewport(currentViewport);
++              renderer.setScissor(currentScissor);
++              renderer.setScissorTest(currentScissorTest);
++              renderer.autoClear = currentAutoClear;
++            }
+           };
+         },
+         remove: function () {
+           var renderer = this.el.renderer;
+           if (renderer && renderer.__stereoModeOriginalRender) {
+             renderer.render = renderer.__stereoModeOriginalRender;
+             delete renderer.__stereoModeOriginalRender;
+           }
+         }
+       });
+-    }();
++    }());
+     </script>
+         <style>
+       * { margin: 0; padding: 0; box-sizing: border-box; }
+       body { overflow: hidden; background: #000; font-family: -apple-system, system-ui, sans-serif; }
+       #fileInput { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 202; }
+       #audioInput { position: fixed; left: -9999px; opacity: 0; width: 1px; height: 1px; }
+       #filePickerOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; display: none; align-items: center; justify-content: center; }
+       #filePickerOverlay .picker-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); }
+       #filePickerBtn { position: relative; background: #5e9eff; color: #fff; border: none; padding: 14px 32px; border-radius: 12px; font-size: 18px; font-weight: 600; cursor: pointer; z-index: 201; box-shadow: 0 4px 20px rgba(94,158,255,0.4); }
+       #cinemaTapOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 300; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); }
+       #cinemaTapBtn { background: #5e9eff; color: #fff; border: none; padding: 18px 40px; border-radius: 16px; font-size: 20px; font-weight: 600; cursor: pointer; z-index: 301; box-shadow: 0 4px 24px rgba(0,0,0,0.6); }
+       .a-canvas { z-index: 1; }
+     </style>
+       </head>
+       <body>
+         <a-scene stereo-mode vr-mode-ui="enabled: true" background="color: #111" loading-screen="enabled: false" renderer="antialias: true; colorManagement: true; maxCanvasWidth: 2048; maxCanvasHeight: 2048">
+         <a-assets>
+         <video id="videoPlayer" crossorigin="anonymous" playsinline webkit-playsinline preload="auto">
+         </video>
+         <img id="gridTex" crossorigin="anonymous" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==">
+         </a-assets>
+         <a-camera position="0 1.6 0" wasd-controls="enabled: false">
+         <a-cursor fuse="true" fuse-timeout="1000" cursor="fuseTick: true" material="color: #5e9eff; opacity: 0.4" raycaster="objects: .interactive; far: 10">
+       </a-cursor>
+     </a-camera>
     <a-sky id="sky">
   </a-sky>
   <!-- Menu Principal (Dock) - Glassmorphism Style -->
